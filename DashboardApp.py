@@ -1930,7 +1930,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Restocking Data", "Restocking by Top 10 Sku", "Restoking by Cooler"],
+            ["General Restocking Data","Restocking by All SKUs","Restocking by Top 10 Sku", "Restoking by Cooler"],
             key="restoking_view"
         )
 
@@ -1961,6 +1961,265 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             {insight_html}
             </div>
             """, unsafe_allow_html=True)  
+
+        elif view_option == "Restocking by All SKUs":
+
+            # Agrupar por producto y calcular los valores promedio
+            df_all_products = df_sku.groupby(["Product Id", "Product"]).agg({
+                "Restocking Frequency (per day)": "mean",
+                "Avg Daily Products Restocked": "mean",
+                "Avg Daily Pulls": "mean",
+                "Avg Time Between Restocks (hours)": "mean"
+            }).reset_index()
+
+            # Crear una nueva columna para etiquetas combinadas
+            df_all_products['Product Label'] = df_all_products['Product'].astype(str)
+
+            # Calcular el promedio de Restocking Frequency (per day)
+            average_daily_restock_incidents = df_all_products['Restocking Frequency (per day)'].mean()
+
+            # Ordenar los datos por frecuencia
+            df_all_products = df_all_products.sort_values(by="Restocking Frequency (per day)", ascending=False)
+
+            # Crear el gráfico con Plotly
+            fig = go.Figure()
+
+            # Agregar barras para Restocking Frequency (per day)
+            fig.add_trace(go.Bar(
+                x=df_all_products['Product Label'],
+                y=df_all_products['Restocking Frequency (per day)'],
+                name='Restocking Frequency (per day)',
+                marker_color='navajowhite',
+                text=[f'{h:.1f}' for h in df_all_products['Restocking Frequency (per day)']],
+                textposition='outside',
+                yaxis="y1"
+            ))
+
+            # Agregar línea para Avg Daily Products Restocked
+            fig.add_trace(go.Scatter(
+                x=df_all_products['Product Label'],
+                y=df_all_products['Avg Daily Products Restocked'],
+                mode='lines+markers',
+                name='Avg Daily Products Restocked',
+                marker=dict(color='green', symbol='x'),
+                line=dict(dash='dash', color='green'),
+                yaxis="y2"
+            ))
+
+            # Agregar línea para Avg Daily Pulls
+            fig.add_trace(go.Scatter(
+                x=df_all_products['Product Label'],
+                y=df_all_products['Avg Daily Pulls'],
+                mode='lines+markers',
+                name='Avg Daily Pulls',
+                marker=dict(color='red', symbol='square'),
+                line=dict(dash='dot', color='red'),
+                yaxis="y2"
+            ))
+
+            # Agregar línea para Avg Time Between Restocks (hours)
+            fig.add_trace(go.Scatter(
+                x=df_all_products['Product Label'],
+                y=df_all_products['Avg Time Between Restocks (hours)'],
+                mode='lines+markers',
+                name='Avg Time Between Restocks (hours)',
+                marker=dict(color='purple', symbol='circle'),
+                line=dict(color='purple'),
+                yaxis="y3"
+            ))
+
+            # Agregar línea horizontal para el promedio de Restocking Frequency
+            fig.add_trace(go.Scatter(
+                x=df_all_products['Product Label'],
+                y=[average_daily_restock_incidents] * len(df_all_products),
+                mode='lines',
+                name=f"Avg Restocking Frequency ({average_daily_restock_incidents:.2f})",
+                line=dict(dash='dash', color='gray'),
+                hoverinfo='skip'
+            ))
+
+            # Configurar diseño del gráfico
+            fig.update_layout(
+                xaxis=dict(
+                    title="Product", 
+                    tickangle=90,
+                    domain=[0, 0.85],
+                ),
+
+                yaxis=dict(
+                    title=dict(text="Restocking Frequency (per day)", font=dict(color="goldenrod")),
+                    tickfont=dict(color="goldenrod"),
+                    title_standoff=10
+                ),
+
+                yaxis2=dict(
+                    title=dict(text="Average Daily Metrics", font=dict(color="green")),
+                    tickfont=dict(color="green"),
+                    overlaying="y",
+                    side="right",
+                    title_standoff=10
+                ),
+
+                yaxis3=dict(
+                    title=dict(text="Avg Time Between Restocks (hours)", font=dict(color="purple")),
+                    tickfont=dict(color="purple"),
+                    overlaying="y",
+                    side="right",
+                    anchor="free",
+                    position=0.99,
+                    title_standoff=10
+                ),
+
+                legend=dict(
+                    orientation="h", 
+                    yanchor="bottom", 
+                    y=1.02, 
+                    xanchor="center", 
+                    x=0.5,
+                ),
+
+                height=800,
+                margin=dict(t=50, b=200, r=100)
+            )
+            
+            fig.update_yaxes(tickangle=0)
+
+            # Mostrar el gráfico en Streamlit
+            filename = f"{view_option}__{location_name}"
+            st.plotly_chart(fig, use_container_width=True,
+                config={"toImageButtonOptions": {"filename": filename}})
+
+            # Mostrar el insight específico para la ubicación y vista
+            insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
+            # Convertir Markdown a HTML
+            insight_html = markdown.markdown(insight)
+            # Justificar el texto usando HTML
+            st.markdown(f"""
+            <div style="text-align: justify;">
+            {insight_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+
+        
+            with st.expander("**Deep dive by product**"):
+                st.markdown("""Allows selecting a specific product (SKU) 
+                to explore its restocking behavior across all coolers in the location.""")
+            # Selector de búsqueda para SKU
+                selected_product = st.selectbox(
+                    "Search for a Product (SKU)",
+                    sorted(df_sku["Product"].dropna().unique()),
+                    key="sku_selector_restoking"
+                )
+
+              
+
+                df_product = df_sku[df_sku["Product"] == selected_product]
+
+                # Agrupar por cooler y calcular los valores promedio
+                restocking_by_cooler = (
+                    df_product.groupby("Deployment").agg({
+                        "Restocking Frequency (per day)": "mean",
+                        "Avg Daily Products Restocked": "mean",
+                        "Avg Daily Pulls": "mean",
+                        "Avg Time Between Restocks (hours)": "mean"
+                    }).reset_index()
+                )
+
+                #Ordenar los datos para el gráfico
+                restocking_by_cooler = restocking_by_cooler.sort_values(by="Restocking Frequency (per day)", ascending=False)
+                # Crear el gráfico para el SKU seleccionado
+                fig_cooler = go.Figure()
+
+                # Agregar barras para Restocking Frequency (per day)
+                fig_cooler.add_trace(go.Bar(
+                    x=restocking_by_cooler["Deployment"],
+                    y=restocking_by_cooler["Restocking Frequency (per day)"],
+                    name="Restocking Frequency (per day)",
+                    marker_color="navajowhite",
+                    text=[f'{h:.1f}' for h in restocking_by_cooler["Restocking Frequency (per day)"]],
+                    textposition="outside",
+                    yaxis="y1"
+                ))
+
+                # Agregar línea para Avg Daily Products Restocked
+                fig_cooler.add_trace(go.Scatter(
+                    x=restocking_by_cooler["Deployment"],
+                    y=restocking_by_cooler["Avg Daily Products Restocked"],
+                    mode="lines+markers",
+                    name="Avg Daily Products Restocked",
+                    marker=dict(color="green", symbol="x"),
+                    line=dict(dash="dash", color="green"),
+                    yaxis="y2"
+                ))
+
+                # Agregar línea para Avg Daily Pulls
+                fig_cooler.add_trace(go.Scatter(
+                    x=restocking_by_cooler["Deployment"],
+                    y=restocking_by_cooler["Avg Daily Pulls"],
+                    mode="lines+markers",
+                    name="Avg Daily Pulls",
+                    marker=dict(color="red", symbol="square"),
+                    line=dict(dash="dot", color="red"),
+                    yaxis="y2"
+                ))
+
+                # Agregar línea para Avg Time Between Restocks (hours)
+                fig_cooler.add_trace(go.Scatter(
+                    x=restocking_by_cooler["Deployment"],
+                    y=restocking_by_cooler["Avg Time Between Restocks (hours)"],
+                    mode="lines+markers",
+                    name="Avg Time Between Restocks (hours)",
+                    marker=dict(color="purple", symbol="circle"),
+                    line=dict(color="purple"),
+                    yaxis="y3"
+                ))
+
+                # Configurar diseño del gráfico
+                fig_cooler.update_layout(
+                    xaxis=dict(
+                        title="Cooler",
+                        tickangle=90,
+                        domain=[0, 0.85]
+                    ),
+                    yaxis=dict(
+                        title=dict(text="Restocking Frequency (per day)", font=dict(color="goldenrod")),
+                        tickfont=dict(color="goldenrod"),
+                        title_standoff=10
+                    ),
+                    yaxis2=dict(
+                        title=dict(text="Average Daily Metrics", font=dict(color="green")),
+                        tickfont=dict(color="green"),
+                        overlaying="y",
+                        side="right",
+                        title_standoff=10
+                    ),
+                    yaxis3=dict(
+                        title=dict(
+                            text="Avg Time Between Restocks (hours)", 
+                            font=dict(color="purple")),
+                        tickfont=dict(color="purple"),
+                        overlaying="y",
+                        side="right",
+                        anchor="free",
+                        position=0.99,
+                        title_standoff=10
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=12,
+                        xanchor="center",
+                        x=0.5
+                    ),
+                    height=600,
+                    margin=dict(t=50, b=200, r=150)
+                )
+
+                # Mostrar el gráfico en Streamlit
+                st.plotly_chart(fig_cooler, use_container_width=True)
+
+                gemini_analysis_button(location_name, selected_product, restocking_by_cooler, metric_type="restock", model_enabled=ENABLE_GEMINI)
 
         elif view_option == "Restocking by Top 10 Sku":
             st.markdown("""The restocking behavior of the top 10 SKUs in the location""")
@@ -2114,125 +2373,6 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             </div>
             """, unsafe_allow_html=True)   
         
-            with st.expander("**Deep dive**"):
-                st.markdown("""Allows selecting a specific product (SKU) 
-                to explore its restocking behavior across all coolers in the location.""")
-            # Selector de búsqueda para SKU
-                selected_product = st.selectbox(
-                    "Search for a Product (SKU)",
-                    sorted(df_sku["Product"].dropna().unique()),
-                    key="sku_selector_restoking"
-                )
-
-              
-
-                df_product = df_sku[df_sku["Product"] == selected_product]
-
-                # Agrupar por cooler y calcular los valores promedio
-                restocking_by_cooler = (
-                    df_product.groupby("Deployment").agg({
-                        "Restocking Frequency (per day)": "mean",
-                        "Avg Daily Products Restocked": "mean",
-                        "Avg Daily Pulls": "mean",
-                        "Avg Time Between Restocks (hours)": "mean"
-                    }).reset_index()
-                )
-
-                #Ordenar los datos para el gráfico
-                restocking_by_cooler = restocking_by_cooler.sort_values(by="Restocking Frequency (per day)", ascending=False)
-                # Crear el gráfico para el SKU seleccionado
-                fig_cooler = go.Figure()
-
-                # Agregar barras para Restocking Frequency (per day)
-                fig_cooler.add_trace(go.Bar(
-                    x=restocking_by_cooler["Deployment"],
-                    y=restocking_by_cooler["Restocking Frequency (per day)"],
-                    name="Restocking Frequency (per day)",
-                    marker_color="navajowhite",
-                    text=[f'{h:.1f}' for h in restocking_by_cooler["Restocking Frequency (per day)"]],
-                    textposition="outside",
-                    yaxis="y1"
-                ))
-
-                # Agregar línea para Avg Daily Products Restocked
-                fig_cooler.add_trace(go.Scatter(
-                    x=restocking_by_cooler["Deployment"],
-                    y=restocking_by_cooler["Avg Daily Products Restocked"],
-                    mode="lines+markers",
-                    name="Avg Daily Products Restocked",
-                    marker=dict(color="green", symbol="x"),
-                    line=dict(dash="dash", color="green"),
-                    yaxis="y2"
-                ))
-
-                # Agregar línea para Avg Daily Pulls
-                fig_cooler.add_trace(go.Scatter(
-                    x=restocking_by_cooler["Deployment"],
-                    y=restocking_by_cooler["Avg Daily Pulls"],
-                    mode="lines+markers",
-                    name="Avg Daily Pulls",
-                    marker=dict(color="red", symbol="square"),
-                    line=dict(dash="dot", color="red"),
-                    yaxis="y2"
-                ))
-
-                # Agregar línea para Avg Time Between Restocks (hours)
-                fig_cooler.add_trace(go.Scatter(
-                    x=restocking_by_cooler["Deployment"],
-                    y=restocking_by_cooler["Avg Time Between Restocks (hours)"],
-                    mode="lines+markers",
-                    name="Avg Time Between Restocks (hours)",
-                    marker=dict(color="purple", symbol="circle"),
-                    line=dict(color="purple"),
-                    yaxis="y3"
-                ))
-
-                # Configurar diseño del gráfico
-                fig_cooler.update_layout(
-                    xaxis=dict(
-                        title="Cooler",
-                        tickangle=90,
-                        domain=[0, 0.85]
-                    ),
-                    yaxis=dict(
-                        title=dict(text="Restocking Frequency (per day)", font=dict(color="goldenrod")),
-                        tickfont=dict(color="goldenrod"),
-                        title_standoff=10
-                    ),
-                    yaxis2=dict(
-                        title=dict(text="Average Daily Metrics", font=dict(color="green")),
-                        tickfont=dict(color="green"),
-                        overlaying="y",
-                        side="right",
-                        title_standoff=10
-                    ),
-                    yaxis3=dict(
-                        title=dict(
-                            text="Avg Time Between Restocks (hours)", 
-                            font=dict(color="purple")),
-                        tickfont=dict(color="purple"),
-                        overlaying="y",
-                        side="right",
-                        anchor="free",
-                        position=0.99,
-                        title_standoff=10
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=12,
-                        xanchor="center",
-                        x=0.5
-                    ),
-                    height=600,
-                    margin=dict(t=50, b=200, r=150)
-                )
-
-                # Mostrar el gráfico en Streamlit
-                st.plotly_chart(fig_cooler, use_container_width=True)
-
-                gemini_analysis_button(location_name, selected_product, restocking_by_cooler, metric_type="restock", model_enabled=ENABLE_GEMINI)
-
         
         elif view_option == "Restoking by Cooler":
             st.markdown("""The restocking behavior across all coolers in the location.""")
@@ -2352,9 +2492,12 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive**"):
-                st.markdown("""Allows selecting a specific cooler to explore its restocking behavior across SKUs in the location.
-                            Use this information for deeper exploration, but note that it does not include specific insights""")
+            with st.expander("**Deep dive by cooler**"):
+                st.markdown("""This selector allows you to change how products are filtered within the selected cooler:
+
+                        - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
+                        - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.
+                                    """)
                 
 
                 # Selector de cooler
@@ -2367,7 +2510,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
                 # Subselector para elegir entre Top 10 General y Top 10 del Cooler
                 product_filter_option = st.radio(
                     "Select Product Filter",
-                    ["Top 10 General", "Top 10 Cooler"],
+                    ["All products", "Top 10 General"],
                     key="product_filter_option_restoking"
                 )
 
