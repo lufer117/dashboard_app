@@ -193,17 +193,6 @@ def load_all_data():
     loc_indexes= pd.read_csv("data/index_by_location.csv")
     index_sum= pd.read_csv("data/index_sum.csv")
     
-    
-    # velocity_hour = pd.read_csv("data/velocity_by_hour.csv")
-    # fills = pd.read_csv("data/fills.csv")
-    # oos = pd.read_csv("data/oos.csv")
-    # temporal = pd.read_csv("data/temporal_patterns.csv")
-    # indexes = pd.read_csv("data/indexes.csv")
-
-    # Load the overview summary
-    # with open("data/overview_table_summary.json", encoding="utf-8") as f:
-    #     overview = json.load(f)
-
     location_ids = pulls[["Location", "Location Id"]].drop_duplicates().set_index("Location")["Location Id"].to_dict()
 
     return {
@@ -247,28 +236,26 @@ def load_key_conclusions():
 
 insights_key_conclusions = load_key_conclusions()
 
-# # Obtener todas las locaciones y normalizar para comparación
-# ALL_LOCATIONS = list(data["location_ids"].keys())
-# normalized_locations = {loc.lower(): loc for loc in ALL_LOCATIONS}
+# Lista de locaciones disponibles
+ALL_LOCATIONS = list(data["location_ids"].keys())
+location_options = ["Store A", "Store B", "All Stores"]
+location_map = {
+    "Store A": "Store A",
+    "Store B": "Store B",
+    "All Stores": ALL_LOCATIONS
+}
 
-# # Input manual
-# user_input = st.sidebar.text_input("Enter location name(s), separated by comma:")
+# Multiselector de locaciones
+selected_locations = st.sidebar.multiselect(
+    "Select location(s):", ALL_LOCATIONS, default=ALL_LOCATIONS
+)
 
-# if user_input:
-#     inputs = [i.strip().lower() for i in user_input.split(",")]
-#     matched = [normalized_locations[i] for i in inputs if i in normalized_locations]
-#     not_matched = [i for i in inputs if i not in normalized_locations]
-
-#     if matched:
-#         ACTIVE_LOCATIONS = matched
-#         if not_matched:
-#             st.sidebar.warning(f"Some locations were not recognized: {', '.join(not_matched)}")
-#     else:
-#         st.sidebar.error("None of the entered locations were recognized.")
-#         st.stop()
-# else:
-#     st.sidebar.info("Please enter at least one location name.")
-#     st.stop()
+# Validar selección
+if selected_locations:
+    ACTIVE_LOCATIONS = selected_locations
+else:
+    st.sidebar.warning("Please select at least one location.")
+    st.stop()
 
 
 # Banner
@@ -601,210 +588,7 @@ def metrics_definitions():
     </div>
     """, unsafe_allow_html=True)
 
-
-
-
-
-    # # KEY METRICS: Velocity by location
-    # st.markdown("<h2 style='font-weight:bold;'>Metrics</h2>", unsafe_allow_html=True)
-    # st.markdown("""
-    # <h4>Product velocity:</h4>
-    # <ol>
-    #     <li>Data is grouped by brand to calculate product velocity per brand.</li>
-    #     <li>Velocity is grouped by location using the full date range to count total days.</li>
-    #     <li>Calculation: total pulls ÷ total days.</li>
-    # </ol>
-    # <div style="border: 1px dashed #bbb; padding: 10px; margin-top: 10px;">
-    #     <i>Placeholder for velocity formula box</i>
-    # </div>
-    # """, unsafe_allow_html=True)
-
-    # # Velocity by hour/day
-    # st.markdown("""
-    # <h4>Product velocity by time of day and day of week:</h4>
-    # <ol>
-    #     <li>Group data by location, hour, and day of week</li>
-    #     <li>Calculate total pulls per hour-day combination</li>
-    #     <li>Divide pulls by total days observed</li>
-    # </ol>
-    # <div style="border: 1px dashed #bbb; padding: 10px;">
-    #     <i>Placeholder for hourly velocity formula</i>
-    # </div>
-    # """, unsafe_allow_html=True)
-
-    # # Restocking
-    # st.markdown("""
-    # <h4>Restocking incidents:</h4>
-    # <ol>
-    #     <li>Filtered by 'Possible Fill' events</li>
-    #     <li>Grouped by timestamp to find intervals</li>
-    #     <li>Calculated average time between restocks</li>
-    #     <li>Total incidents + quantity restocked by location/brand/product</li>
-    # </ol>
-    # <div style="border: 1px dashed #bbb; padding: 10px;">
-    #     <i>Placeholder for restocking metric box</i>
-    # </div>
-    # """, unsafe_allow_html=True)
-
-    # # OOS incidents
-    # st.markdown("""
-    # <h4>OOS incidents:</h4>
-    # <ol>
-    #     <li>Filter events with Data == 0 and Status == Possible Pull</li>
-    #     <li>Sort by timestamp</li>
-    #     <li>Track start and end of OOS windows</li>
-    #     <li>Count total OOS incidents per location/product</li>
-    # </ol>
-    # <div style="border: 1px dashed #bbb; padding: 10px;">
-    #     <i>Placeholder for OOS equation box</i>
-    # </div>
-    # """, unsafe_allow_html=True)
-
-# def general_overview(location_filter, overview_table, overview_stats, general_insights):
-#     if not location_filter:
-#         st.warning("No locations to display.")
-#         return
-
-#     if len(location_filter) == 1:
-#         tab = st.tabs(location_filter)
-#         with tab[0]:
-#             df_overview = overview_table[overview_table["Location"] == location_filter[0]].drop(columns=["Location"]).T
-#             df_overview.columns = ["Value"]
-#             df_overview.index.name = "Metric"
-#             st.dataframe(df_overview, use_container_width=True)
-#     else:
-#         tabs = st.tabs(location_filter + ["Comparison"])
-#         for i, loc in enumerate(location_filter):
-#             with tabs[i]:
-#                 df = overview_stats[overview_stats["Location"] == loc].drop(columns=["Location"]).T
-#                 df.columns = ["Value"]
-#                 df.index.name = "Metric"
-#                 st.dataframe(df, use_container_width=True)
-
-#         with tabs[-1]:
-#             mode = st.radio("Comparison Mode", ["General Comparison", "Compare by Metric", "Compare by Location"])
-#             summary_no_total = overview_stats[overview_stats["Location"].isin(location_filter)]
-
-#             if mode == "General Comparison":
-#                 melt_df = summary_no_total.melt(id_vars="Location", var_name="Metric", value_name="Value")
-#                 melt_df = melt_df[melt_df["Metric"].isin([
-#                     'Total Pulls', 'Total Fills', 'OOS Incidents'
-#                 ])].copy()
-
-#                 for metric in melt_df["Metric"].unique():
-#                     total_metric = melt_df[melt_df["Metric"] == metric]["Value"].sum()
-#                     melt_df.loc[melt_df["Metric"] == metric, "%"] = (
-#                         melt_df.loc[melt_df["Metric"] == metric, "Value"] / total_metric * 100
-#                     )
-
-#                 fig = px.bar(
-#                     melt_df,
-#                     x="Location",
-#                     y="%",
-#                     color="Metric",
-#                     barmode="group",
-#                     title="Comparison of Metrics by Location (%)",
-#                     text=melt_df["%"].map("{:.2f}%".format),
-#                     color_discrete_map={
-#                         'Total Pulls': '#064f14',
-#                         'Total Fills': '#FFDEAD',
-#                         'OOS Incidents': '#CD5C5C'
-#                     },
-#                     custom_data=["Value"]
-#                 )
-#                 fig.update_traces(
-#                     textposition='outside',
-#                     hovertemplate=(
-#                         "Location: %{x}<br>"
-#                         "Metric: %{legendgroup}<br>"
-#                         "Percentage: %{y:.2f}%<br>"
-#                         "Value: %{customdata[0]:,.0f}<extra></extra>"
-#                     )
-#                 )
-#                 fig.update_yaxes(title_text="Percentage (%)")
-#                 st.plotly_chart(fig, use_container_width=True)
-
-#                 insight = general_insights.get("General Comparison", "No insight available for this view.")
-#                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
-
-#             elif mode == "Compare by Metric":
-#                 metric = st.selectbox("Select a metric", [
-#                     'Total Pulls', 'Total Fills', 'OOS Incidents',
-#                     'SKU Count', 'Coolers Count'
-#                 ])
-#                 color_map = {
-#                     'Total Pulls': '#064f14',
-#                     'Total Fills': '#FFDEAD',
-#                     'OOS Incidents': '#CD5C5C',
-#                     'SKU Count': '#B0C4DE',
-#                     'Coolers Count': '#778899'
-#                 }
-
-#                 if metric in ['Total Pulls', 'Total Fills', 'OOS Incidents','SKU Count', 'Coolers Count']:
-#                     total = summary_no_total[metric].sum()
-#                     summary_no_total["%"] = summary_no_total[metric] / total * 100
-
-#                     fig = px.bar(
-#                         summary_no_total,
-#                         x="Location",
-#                         y="%",
-#                         text=summary_no_total["%"].map("{:.2f}%".format),
-#                         title=f"{metric} by Location (%)",
-#                         color_discrete_sequence=[color_map[metric]],
-#                         custom_data=[summary_no_total[metric]]
-#                     )
-#                     fig.update_yaxes(title_text="Percentage (%)")
-#                     fig.update_traces(
-#                         textposition='outside',
-#                         hovertemplate=(
-#                             "Location: %{x}<br>"
-#                             "Percentage: %{y:.2f}%<br>"
-#                             f"{metric}: %{{customdata[0]:,.0f}}<extra></extra>"
-#                         )
-#                     )
-#                 else:
-#                     fig = px.bar(
-#                         summary_no_total,
-#                         x="Location",
-#                         y=metric,
-#                         text=metric,
-#                         title=f"{metric} by Location",
-#                         color_discrete_sequence=[color_map[metric]]
-#                     )
-#                     fig.update_yaxes(title_text="Count")
-#                     fig.update_traces(textposition='outside')
-
-#                 st.plotly_chart(fig, use_container_width=True)
-
-#                 insight = general_insights.get(f"Compare by Metric - {metric}", "No insight available for this view.")
-#                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
-
-#             elif mode == "Compare by Location":
-#                 location = st.selectbox("Select a location", summary_no_total["Location"].unique())
-#                 row = overview_stats[overview_stats["Location"] == location].melt(
-#                     id_vars="Location", var_name="Metric", value_name="Value"
-#                 )
-#                 fig = px.bar(
-#                     row,
-#                     x="Metric",
-#                     y="Value",
-#                     color="Metric",
-#                     text="Value",
-#                     title=f"Metrics for {location}",
-#                     color_discrete_map={
-#                         'Total Pulls': '#064f14',
-#                         'Total Fills': '#FFDEAD',
-#                         'OOS Incidents': '#CD5C5C',
-#                         'SKU Count': '#B0C4DE',
-#                         'Coolers Count': '#778899'
-#                     }
-#                 )
-#                 fig.update_traces(textposition='outside')
-#                 st.plotly_chart(fig, use_container_width=True)
-
-#                 insight = general_insights.get(f"Compare by Location - {location}", "No insight available for this view.")
-#                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
-
+    
 def general_overview(location_filter, overview_table, overview_stats, general_insights):
     if not location_filter:
         st.warning("No locations to display.")
@@ -3827,7 +3611,7 @@ def location_analysis(location_id: int, data: dict):
 
 # Sidebar Navigation
 # --- CONFIGURACIÓN DE LOCACIONES ACTIVAS ---
-ACTIVE_LOCATIONS = ["Store A", "Store B"]  # ← Cambia esto según lo que quieras mostrar
+# ACTIVE_LOCATIONS = ["Store A", "Store B"]  # ← Cambia esto según lo que quieras mostrar
 
 location_slides = [f"{loc} Analysis" for loc in ACTIVE_LOCATIONS]
 
