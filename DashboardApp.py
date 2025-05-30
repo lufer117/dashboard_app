@@ -213,7 +213,7 @@ data = load_all_data()
 
 @st.cache_data
 def load_general_insights():
-    with open("insights/insights_general_lorem.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_general_gem.json", "r", encoding="utf-8") as f:
         general_insights = json.load(f)
     return general_insights
 
@@ -221,7 +221,7 @@ general_insights = load_general_insights()
 
 @st.cache_data
 def load_insights():
-    with open("insights/insights_gem_lorem.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_gem.json", "r", encoding="utf-8") as f:
         insights = json.load(f)
     return insights
 
@@ -230,7 +230,7 @@ insights = load_insights()
 
 @st.cache_data
 def load_key_conclusions():
-    with open("insights/insights_key_conclusions_lorem.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_key_conclusions.json", "r", encoding="utf-8") as f:
         general_insights = json.load(f)
     return general_insights
 
@@ -264,9 +264,18 @@ def presentation():
     st.image("assets/presentation_banner.png", use_container_width=True)
     #escribir marckdown
     st.markdown("""<div style="text-align: justify"> 
-                This is a generic version based on an app developed for product analysis at points of sale. 
-                The data has been modified or generated for illustrative purposes
-    </div>
+                This is a <b>generic version</b> based on an app developed for product analysis at points of sale. 
+                The data has been modified or generated for illustrative purposes.<br><br>
+                <p>
+                <b>The original application</b> was built for a client who has sensors installed on retail shelves to monitor product movement in real time. The solution goes beyond simple data visualization—it aims to support a deeper understanding of customer behavior, product performance, and restocking efficiency.
+                </p>
+                <p>
+                Insights shown in the general graphs were generated using Gemini, via an API connected to a Google Colab environment that processed the data. Additionally, a button has been included in the app to potentially generate insights for deep-dive views as well.
+                </p>
+                <p>      
+                However, generating these on-demand insights would require deploying a Vertex AI API, which involves billing activation. Since this version is meant for demonstration purposes only, the API is not enabled here—unlike in the client’s deployed version, where the full Vertex AI service is active and integrated.
+                </p>
+                </div>
     """, unsafe_allow_html=True)
 
 def dataset():
@@ -522,7 +531,7 @@ def metrics_definitions():
 
     ---
     
-    <h5> Restoking metrics </h5>
+    <h5> Restocking metrics </h5>
 
     - **Total Restocking Incidents and Total Products Restocked**: The resulting values represent the total restocking actions and the cumulative quantity of products restocked for each location/brand/product
         
@@ -617,9 +626,11 @@ def general_overview(location_filter, overview_table, overview_stats, general_in
             
 
             mode = st.radio("Comparison Mode", ["General Comparison", "Compare by Metric", "Compare by Location"])
+            
             summary_no_total = overview_stats[overview_stats["Location"].isin(location_filter)].copy()
             
             if mode == "General Comparison":
+                filename = "General_Comparison__All_Locations"
                 melt_df = summary_no_total.melt(id_vars="Location", var_name="Metric", value_name="Value")
                 melt_df = melt_df[melt_df["Metric"].isin([
                     'Total Pulls', 'Total Fills', 'OOS Incidents'
@@ -656,7 +667,13 @@ def general_overview(location_filter, overview_table, overview_stats, general_in
                     )
                 )
                 fig.update_yaxes(title_text="Percentage (%)")
-                st.plotly_chart(fig, use_container_width=True)
+
+                
+                st.plotly_chart(fig, use_container_width=True, config={
+                                "toImageButtonOptions": {"filename": filename}
+                            })
+
+                
 
                 insight = general_insights.get("General Comparison", "No insight available for this view.")
                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
@@ -712,7 +729,11 @@ def general_overview(location_filter, overview_table, overview_stats, general_in
                     fig.update_yaxes(title_text="Count")
                     fig.update_traces(textposition='outside')
 
-                st.plotly_chart(fig, use_container_width=True)
+                filename = f"Compare_by_Metric__{metric.replace(' ', '_')}"
+
+                st.plotly_chart(fig, use_container_width=True, config={
+                                "toImageButtonOptions": {"filename": filename}
+                            })
 
                 insight = general_insights.get(f"Compare by Metric - {metric}", "No insight available for this view.")
                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
@@ -738,8 +759,12 @@ def general_overview(location_filter, overview_table, overview_stats, general_in
                     }
                 )
                 fig.update_traces(textposition='outside')
-                st.plotly_chart(fig, use_container_width=True)
 
+                filename = f"Compare_by_Location__{location.replace(' ', '_')}"
+                st.plotly_chart(fig, use_container_width=True, config={
+                                "toImageButtonOptions": {"filename": filename}
+                            })
+             
                 insight = general_insights.get(f"Compare by Location - {location}", "No insight available for this view.")
                 st.markdown(f"<div style='text-align: justify;'>{markdown.markdown(insight)}</div>", unsafe_allow_html=True)
 
@@ -1365,7 +1390,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                             config={"toImageButtonOptions": {"filename": filename}})
 
             st.caption("Fullscreen to see the full chart")
-            
+
             # Insight
             insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
             # Convertir Markdown a HTML
@@ -1707,7 +1732,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
 
 
 def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, location_id, location_name, insights):
-    st.markdown("### Restoking Analysis")          
+    st.markdown("### Restocking Analysis")          
     
     df_sku = restock_sum[restock_sum["Location Id"] == location_id].copy()
     df_restock = loc_restock_sum[loc_restock_sum["Location Id"] == location_id].copy()
@@ -1719,7 +1744,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Restocking Data","Restocking by All SKUs","Restocking by Top 10 Sku", "Restoking by Shelf"],
+            ["General Restocking Data","Restocking by All SKUs","Restocking by Top 10 Sku", "Restocking by Shelf"],
             key="restoking_view"
         )
 
@@ -2163,7 +2188,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             """, unsafe_allow_html=True)   
         
         
-        elif view_option == "Restoking by Shelf":
+        elif view_option == "Restocking by Shelf":
             st.markdown("""The restocking behavior across all coolers in the location.""")
 
             # Agrupar por Shelf y calcular las métricas
@@ -3552,7 +3577,7 @@ def location_analysis(location_id: int, data: dict):
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Total Pulls",
         "Product Velocity",
-        "Restoking Analysis",
+        "Restocking Analysis",
         "OOS Incidents",
         "Indexes",
         
