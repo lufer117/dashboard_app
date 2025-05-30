@@ -84,7 +84,7 @@ def gemini_analysis_button(
                     Location: {location_name}
                     Product: {selected_product}
 
-                    Total {metric_type.title()}s by Cooler:
+                    Total {metric_type.title()}s by Shelf:
                     {df_metric_by_cooler.to_string(index=False)}
 
                     Short performance summarize, detect anomalies, patterns, and suggest operational actions.
@@ -149,10 +149,10 @@ def gemini_analysis_by_cooler(
                     model = GenerativeModel("gemini-2.0-flash")
 
                     prompt = f"""
-                    Analyze the {metric_type} performance by SKU for this cooler.
+                    Analyze the {metric_type} performance by SKU for this shelf.
 
                     Location: {location_name}
-                    Cooler: {selected_cooler}
+                    Shelf: {selected_cooler}
 
                     Total {metric_type.title()}s by Product:
                     {df_metric_by_product.to_string(index=False)}
@@ -178,7 +178,7 @@ def gemini_analysis_by_cooler(
             else:
                 st.info("This feature will be available soon. Gemini integration is not yet active.")
     else:
-        st.info(f"You already ran Gemini analysis for this Cooler ({metric_type}) in this session.")
+        st.info(f"You already ran Gemini analysis for this Shelf ({metric_type}) in this session.")
 
 
 @st.cache_data
@@ -410,7 +410,7 @@ def methodology():
         
         <li><b>Datetime Range Check:</b> Parsed <code>Location Local Datetime</code> and validated the full dataset's date range: from <b>October 1, 2024</b> to <b>May 1, 2025</b>.</li>
         
-        <li><b>Object Columns Profiling:</b> Printed all unique values in object-type columns to check for anomalies or encoding issues, including cooler and shelf labels.</li>
+        <li><b>Object Columns Profiling:</b> Printed all unique values in object-type columns to check for anomalies or encoding issues, including shelf labels.</li>
         
         <li><b>Invalid Product Records:</b> Identified records with invalid <code>Product Id = -1</code> or <code>Product = NaN</code> as candidates for removal.</li>
         </ol>
@@ -445,7 +445,7 @@ def methodology():
             - These rows likely represent unidentified or manually moved items without a proper SKU assignment.
 
             5. **Deployment Name Simplification**
-            - The suffix “- Compass Group HQ” was removed from the `Deployment` names to streamline cooler labeling.
+            - The suffix “- Compass Group HQ” was removed from the `Deployment` names to streamline Shelf labeling.
 
             6. **Sorting and Reindexing**
             - The dataset was sorted by `Location`, `Product`, and `Location Local Datetime` to prepare for time series analysis.
@@ -491,7 +491,7 @@ def metrics_definitions():
     <div style='text-align: justify'>
                 
     <p>
-    This section describes the logic used to calculate key performance indicators for cooler performance,
+    This section describes the logic used to calculate key performance indicators for shelf performance,
     including product consumption, restocking behavior, and stockout patterns.
     </p>
 
@@ -754,7 +754,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Overview Pulls","Pulls by All SKUs","Pulls by Top 10 SKU", "Pulls by Cooler"],
+            ["General Overview Pulls","Pulls by All SKUs","Pulls by Top 10 SKU", "Pulls by Shelf"],
             key="total_pulls_view"
         )
 
@@ -862,12 +862,16 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                 bgcolor="white"
             )
 
-            fig_all.update_layout(height=20 * len(all_products))
+
+            fig_all.update_layout(height=20 * 20)
+            
+
 
             filename = f"{view_option}__{location_name}"
             st.plotly_chart(fig_all, use_container_width=True, key="pulls_all_skus_chart",
                             config={"toImageButtonOptions": {"filename": filename}})
-
+            st.caption("Fullscreen to see the full chart")
+            
             insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
             insight_html = markdown.markdown(insight)
             st.markdown(f"""
@@ -892,7 +896,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                 # Filtrar los datos para el producto seleccionado
                 df_product = df_loc[df_loc["Product"] == selected_product]
 
-                # Agrupar por cooler y calcular los pulls
+                # Agrupar por Shelf y calcular los pulls
                 pulls_by_cooler = (
                     df_product.groupby("Deployment")["Total Pulls"]
                     .sum()
@@ -900,7 +904,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     .reset_index()
                 )
 
-                # Calcular el porcentaje de pulls por cooler para el SKU seleccionado
+                # Calcular el porcentaje de pulls por Shelf para el SKU seleccionado
                 total_pulls_sku = pulls_by_cooler["Total Pulls"].sum()
                 pulls_by_cooler["% Pulls"] = (pulls_by_cooler["Total Pulls"] / total_pulls_sku) * 100
 
@@ -913,7 +917,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     x="% Pulls",
                     y="Deployment",
                     orientation="h",
-                    title=f"Total Pulls by Cooler for Product: {selected_product}",
+                    title=f"Total Pulls by Shelf for Product: {selected_product}",
                     text=pulls_by_cooler["% Pulls"].map("{:.2f}%".format),
                     color_discrete_sequence=["#2E8B57"],  # Color verde
                     custom_data=["Total Pulls"]
@@ -921,7 +925,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                 fig_cooler.update_traces(
                     textposition="outside",
                     hovertemplate=(
-                        "Cooler: %{y}<br>"
+                        "Shelf: %{y}<br>"
                         "Percentage: %{x:.2f}%<br>"
                         "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
                     )
@@ -945,7 +949,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     yanchor="bottom",
                     bgcolor="white"
                 )
-                fig_cooler.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="% of Total Pulls"))
+                fig_cooler.update_layout(yaxis=dict(title="Shelf"), xaxis=dict(title="% of Total Pulls"))
                 st.plotly_chart(fig_cooler, use_container_width=True, key="cooler_for_product_chart")
 
                 gemini_analysis_button(location_name, selected_product, pulls_by_cooler, metric_type="pull", model_enabled=ENABLE_GEMINI)
@@ -1074,10 +1078,10 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)         
 
-        elif view_option == "Pulls by Cooler":
-            st.markdown("""Shows overall pulls per cooler, and breaks down the SKUs within each cooler.
+        elif view_option == "Pulls by Shelf":
+            st.markdown("""Shows overall pulls per shelf, and breaks down the SKUs within each Shelf
                 """)
-            # Vista de Pulls por Cooler
+            # Vista de Pulls por Shelf
             pulls_by_cooler = (
                 df_loc.groupby("Deployment")["Total Pulls"]
                 .sum()
@@ -1086,7 +1090,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             )
             #organizar los datos para el gráfico ascending
             
-            # Calcular el porcentaje de pulls por cooler
+            # Calcular el porcentaje de pulls por Shelf
             total_pulls_location = pulls_by_cooler["Total Pulls"].sum()
             pulls_by_cooler["% Pulls"] = (pulls_by_cooler["Total Pulls"] / total_pulls_location) * 100
             
@@ -1097,7 +1101,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                 x="% Pulls",
                 y="Deployment",
                 orientation="h",
-                title="Total Pulls by Cooler (%)",
+                title="Total Pulls by Shelf (%)",
                 text=pulls_by_cooler["% Pulls"].map("{:.2f}%".format),
                 color_discrete_sequence=["#2E8B57"],  # Color verde
                 custom_data=["Total Pulls"]
@@ -1105,13 +1109,13 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             fig_cooler.update_traces(
                 textposition="outside",
                 hovertemplate=(
-                    "Cooler: %{y}<br>"
+                    "Shelf: %{y}<br>"
                     "Percentage: %{x:.2f}%<br>"
                     "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
                 )
             )
 
-            # Calcular el promedio de % Pulls por cooler
+            # Calcular el promedio de % Pulls por Shelf
             avg_percent = pulls_by_cooler["% Pulls"].mean()
             # Agregar línea de promedio
             fig_cooler.add_shape(
@@ -1131,7 +1135,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                 bgcolor="white"
             )
 
-            fig_cooler.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="% of Total Pulls"))
+            fig_cooler.update_layout(yaxis=dict(title="Shelf"), xaxis=dict(title="% of Total Pulls"))
             
             filename = f"{view_option}__{location_name}"
             st.plotly_chart(fig_cooler, use_container_width=True, key="cooler_chart",
@@ -1147,18 +1151,18 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep Dive by cooler**"):
+            with st.expander("**Deep Dive by Shelf**"):
                 st.markdown("""
-                             This selector allows you to change how products are filtered within the selected cooler:
+                             This selector allows you to change how products are filtered within the selected shelf:
 
-                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
-                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+                - **All Products**: Displays all SKUs available in the selected shelf during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected shelf.               
                 """)
                             
                 
-                # Selector de cooler
+                # Selector de Shelf
                 selected_cooler = st.selectbox(
-                    "Select a Cooler",
+                    "Select a Shelf",
                     sorted(df_loc["Deployment"].dropna().unique()),
                     key="cooler_selector"
                 )
@@ -1170,7 +1174,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     key="product_filter_option"
                 )
 
-                # Filtrar los datos para el cooler seleccionado
+                # Filtrar los datos para el Shelf seleccionado
                 df_cooler = df_loc[df_loc["Deployment"] == selected_cooler]
 
                 if product_filter_option == "Top 10 General":
@@ -1193,7 +1197,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     .reset_index()
                 )
 
-                # Calcular el porcentaje de pulls por producto en el cooler
+                # Calcular el porcentaje de pulls por producto en el Shelf
                 total_pulls_cooler = pulls_by_product["Total Pulls"].sum()
                 pulls_by_product["% Pulls"] = (pulls_by_product["Total Pulls"] / total_pulls_cooler) * 100
 
@@ -1206,7 +1210,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                     x="% Pulls",
                     y="Product",
                     orientation="h",
-                    title=f"Total Pulls by Product in Cooler: {selected_cooler} ({product_filter_option})",
+                    title=f"Total Pulls by Product in Shelf: {selected_cooler} ({product_filter_option})",
                     text=pulls_by_product["% Pulls"].map("{:.2f}%".format),
                     color_discrete_sequence=["#2E8B57"],  # Color verde
                     custom_data=["Total Pulls"]
@@ -1219,7 +1223,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                         "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
                     )
                 )
-                # Calcular el promedio de % Pulls para los productos en el cooler
+                # Calcular el promedio de % Pulls para los productos en el Shelf
                 avg_percent = pulls_by_product["% Pulls"].mean()
                 # Agregar línea de promedio
                 fig_product.add_shape(
@@ -1261,7 +1265,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Product Velocity","PV by All SKUs","PV by Top 10 Sku", "PV by Cooler"],
+            ["General Product Velocity","PV by All SKUs","PV by Top 10 Sku", "PV by Shelf"],
             key="product_velocity_view"
         )
 
@@ -1313,7 +1317,6 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                 df_loc.groupby("Product")["Total Pulls"]
                 .sum()
                 .sort_values(ascending=False)
-                .head(10)
                 .reset_index()
             )
 
@@ -1339,7 +1342,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                 color_discrete_sequence=["#4682B4", "#ADD8E6"]
             )
             fig.update_layout(
-                height=20 * len(all_products),
+                height=30 *20,
                 yaxis=dict(title="Product"),
                 xaxis=dict(title="Velocity (pulls/day)")
             )
@@ -1361,6 +1364,8 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             st.plotly_chart(fig, use_container_width=True,
                             config={"toImageButtonOptions": {"filename": filename}})
 
+            st.caption("Fullscreen to see the full chart")
+            
             # Insight
             insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
             # Convertir Markdown a HTML
@@ -1393,7 +1398,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                     .rename(columns={"Date": "Active Days"})
                 )
 
-                # Gráfico de Product Velocity por cooler para el SKU seleccionado
+                # Gráfico de Product Velocity por Shelf para el SKU seleccionado
                 velocity_by_cooler_sku = (
                     df_product.groupby("Deployment")["Total Pulls"]
                     .sum()
@@ -1421,12 +1426,12 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                     x=["Velocity (Active Days)", "Velocity (Period)"],
                     y="Deployment",
                     orientation="h",
-                    title=f"Product Velocity by Cooler for SKU: {selected_product}",
+                    title=f"Product Velocity by Shelf for SKU: {selected_product}",
                     barmode="group",
                     text_auto=True,
                     color_discrete_sequence=["#4682B4", "#ADD8E6"]
                 )
-                fig_sku.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="Velocity (pulls/day)"))
+                fig_sku.update_layout(yaxis=dict(title="Shelf"), xaxis=dict(title="Velocity (pulls/day)"))
 
                 # Calcular el promedio de Velocity (Period)
                 avg_velocity_period = velocity_by_cooler_sku["Velocity (Period)"].mean()
@@ -1527,9 +1532,9 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             """, unsafe_allow_html=True)
 
             
-        elif view_option == "PV by Cooler":
+        elif view_option == "PV by Shelf":
             st.markdown("""
-                        The velocity at which products are consumed by the cooler.
+                        The velocity at which products are consumed by the Shelf.
                         """)
             
             df_loc["Location Local Datetime"] = pd.to_datetime(df_loc["Location Local Datetime"], errors='coerce')
@@ -1537,7 +1542,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             # Calcular la fecha mínima y máxima para obtener el total de días en la data
             total_days = (df_loc["Location Local Datetime"].dt.date.max() - df_loc["Location Local Datetime"].dt.date.min()).days + 1
 
-            # Calcular días únicos con datos por cooler
+            # Calcular días únicos con datos por Shelf
             active_days_by_cooler = (
                 df_loc.groupby("Deployment")["Date"]
                 .nunique()
@@ -1545,7 +1550,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                 .rename(columns={"Date": "Active Days"})
             )
             
-            # Gráfico general de Product Velocity por cooler
+            # Gráfico general de Product Velocity por Shelf
             velocity_by_cooler = (
                 df_loc.groupby("Deployment")["Total Pulls"]
                 .sum()
@@ -1572,12 +1577,12 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                 x=["Velocity (Active Days)", "Velocity (Period)"],
                 y="Deployment",
                 orientation="h",
-                title="Product Velocity by Cooler",
+                title="Product Velocity by Shelf",
                 barmode="group",
                 text_auto=True,
                 color_discrete_sequence=["#4682B4", "#ADD8E6"]
             )
-            fig_cooler.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="Velocity (pulls/day)"))
+            fig_cooler.update_layout(yaxis=dict(title="Shelf"), xaxis=dict(title="Velocity (pulls/day)"))
 
             # Calcular el promedio de Velocity (Period)
             avg_velocity_period = velocity_by_cooler["Velocity (Period)"].mean()
@@ -1609,24 +1614,24 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive by cooler**"):
+            with st.expander("**Deep dive by Shelf**"):
                 st.markdown("""
-                This selector allows you to change how products are filtered within the selected cooler:
+                This selector allows you to change how products are filtered within the selected Shelf:
 
-                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
-                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+                - **All Products**: Displays all SKUs available in the selected Shelf during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected Shelf.               
                 """)
-                # Selector de cooler
+                # Selector de Shelf
                 selected_cooler = st.selectbox(
-                    "Select a Cooler",
+                    "Select a Shelf",
                     sorted(df_loc["Deployment"].dropna().unique()),
                     key="cooler_selector_velocity"
                 )
 
-                # Filtrar los datos para el cooler seleccionado
+                # Filtrar los datos para el Shelf seleccionado
                 df_cooler = df_loc[df_loc["Deployment"] == selected_cooler]
 
-                # Subselector para elegir entre Top 10 General y Top 10 del Cooler
+                # Subselector para elegir entre Top 10 General y Top 10 del Shelf
                 product_filter_option = st.radio(
                     "Select Product Filter",
                     ["All products", "Top 10 General"],
@@ -1643,7 +1648,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                     )
                     df_cooler = df_cooler[df_cooler["Product"].isin(top_10_general["Product"])]
 
-                  # Calcular días únicos con datos por producto en el cooler seleccionado
+                  # Calcular días únicos con datos por producto en el Shelf seleccionado
                 active_days_by_cooler = (
                     df_cooler.groupby("Product")["Date"]
                     .nunique()
@@ -1651,7 +1656,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                     .rename(columns={"Date": "Active Days"})
                 )   
 
-                # Gráfico del Top 10 SKUs del cooler seleccionado
+                # Gráfico del Top 10 SKUs del Shelf seleccionado
                 top_velocity_cooler = (
                     df_cooler.groupby("Product")["Total Pulls"]
                     .sum()
@@ -1675,7 +1680,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                     x=["Velocity (Active Days)", "Velocity (Period)"],
                     y="Product",
                     orientation="h",
-                    title=f"Top 10 SKUs in Cooler: {selected_cooler}",
+                    title=f"Top 10 SKUs in Shelf: {selected_cooler}",
                     barmode="group",
                     text_auto=True,
                     color_discrete_sequence=["#4682B4", "#ADD8E6"]
@@ -1714,7 +1719,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Restocking Data","Restocking by All SKUs","Restocking by Top 10 Sku", "Restoking by Cooler"],
+            ["General Restocking Data","Restocking by All SKUs","Restocking by Top 10 Sku", "Restoking by Shelf"],
             key="restoking_view"
         )
 
@@ -1900,7 +1905,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
 
                 df_product = df_sku[df_sku["Product"] == selected_product]
 
-                # Agrupar por cooler y calcular los valores promedio
+                # Agrupar por Shelf y calcular los valores promedio
                 restocking_by_cooler = (
                     df_product.groupby("Deployment").agg({
                         "Restocking Frequency (per day)": "mean",
@@ -1962,7 +1967,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
                 # Configurar diseño del gráfico
                 fig_cooler.update_layout(
                     xaxis=dict(
-                        title="Cooler",
+                        title="Shelf",
                         tickangle=90,
                         domain=[0, 0.85]
                     ),
@@ -2158,10 +2163,10 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             """, unsafe_allow_html=True)   
         
         
-        elif view_option == "Restoking by Cooler":
+        elif view_option == "Restoking by Shelf":
             st.markdown("""The restocking behavior across all coolers in the location.""")
 
-            # Agrupar por cooler y calcular las métricas
+            # Agrupar por Shelf y calcular las métricas
             restocking_by_cooler = (
                 df_sku.groupby("Deployment").agg({
                     "Restocking Frequency (per day)": "mean",
@@ -2224,7 +2229,7 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             # Configurar diseño del gráfico
             fig_cooler.update_layout(
                 xaxis=dict(
-                    title="Cooler",
+                    title="Shelf",
                     tickangle=90,
                     domain=[0, 0.85]
                 ),
@@ -2276,29 +2281,29 @@ def tab3_restoking_analysis(df_sku, df_restock, restock_sum, loc_restock_sum, lo
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive by cooler**"):
-                st.markdown("""This selector allows you to change how products are filtered within the selected cooler:
+            with st.expander("**Deep dive by Shelf**"):
+                st.markdown("""This selector allows you to change how products are filtered within the selected Shelf:
 
-                        - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
-                        - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.
+                        - **All Products**: Displays all SKUs available in the selected Shelf during the analysis period.
+                        - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected Shelf.
                                     """)
                 
 
-                # Selector de cooler
+                # Selector de Shelf
                 selected_cooler = st.selectbox(
-                    "Select a Cooler",
+                    "Select a Shelf",
                     sorted(df_sku["Deployment"].dropna().unique()),
                     key="cooler_selector_restoking"
                 )
 
-                # Subselector para elegir entre Top 10 General y Top 10 del Cooler
+                # Subselector para elegir entre Top 10 General y Top 10 del Shelf
                 product_filter_option = st.radio(
                     "Select Product Filter",
                     ["All products", "Top 10 General"],
                     key="product_filter_option_restoking"
                 )
 
-                # Filtrar los datos para el cooler seleccionado
+                # Filtrar los datos para el Shelf seleccionado
                 df_cooler = df_sku[df_sku["Deployment"] == selected_cooler]
 
                 if product_filter_option == "Top 10 General":
@@ -2430,7 +2435,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General OOS Data","OOS by All SKUs", "OOS by Top 10 Sku", "OOS by Cooler"],
+            ["General OOS Data","OOS by All SKUs", "OOS by Top 10 Sku", "OOS by Shelf"],
             key="oos_view"
         )
 
@@ -2586,7 +2591,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
                 # Filtrar el dataset para el producto seleccionado
                 df_product = df_oos_restock[df_oos_restock["Product"] == selected_product]
 
-                # Agrupar por cooler y calcular métricas promedio de OOS y Restocking
+                # Agrupar por Shelf y calcular métricas promedio de OOS y Restocking
                 oos_by_cooler = (
                     df_product.groupby("Deployment").agg({
                         "OOS Frequency (per day)": "mean",
@@ -2663,7 +2668,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
                 # Diseño del gráfico
                 fig_cooler.update_layout(
                     xaxis=dict(
-                        title="Cooler",
+                        title="Shelf",
                         tickangle=90,
                         domain=[0, 0.85]
                     ),
@@ -2822,10 +2827,10 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             </div>
             """, unsafe_allow_html=True)
         
-        elif view_option == "OOS by Cooler":
+        elif view_option == "OOS by Shelf":
             st.markdown("""The OOS behavior across all coolers in the location.""")
 
-            # Agrupar por Deployment (cooler) y calcular métricas promedio de OOS y Restocking
+            # Agrupar por Deployment (Shelf) y calcular métricas promedio de OOS y Restocking
             oos_by_cooler = (
                 df_oos_restock.groupby("Deployment").agg({
                     "OOS Frequency (per day)": "mean",
@@ -2902,7 +2907,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             # Configuración del layout
             fig_cooler.update_layout(
                 xaxis=dict(
-                    title="Cooler",
+                    title="Shelf",
                     tickangle=90,
                     
                 ),
@@ -2943,15 +2948,15 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive by cooler**"):
-                st.markdown("""This selector allows you to change how products are filtered within the selected cooler:
-                            - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
-                            - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+            with st.expander("**Deep dive by Shelf**"):
+                st.markdown("""This selector allows you to change how products are filtered within the selected Shelf:
+                            - **All Products**: Displays all SKUs available in the selected Shelf during the analysis period.
+                            - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected Shelf.               
                             """)
 
-                # Selector de cooler
+                # Selector de Shelf
                 selected_cooler = st.selectbox(
-                    "Select a Cooler",
+                    "Select a Shelf",
                     sorted(df_oos_restock["Deployment"].dropna().unique()),
                     key="cooler_selector_oos"
                 )
@@ -2963,7 +2968,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
                     key="product_filter_option_oos"
                 )
 
-                # Filtrar datos por cooler
+                # Filtrar datos por Shelf
                 df_cooler = df_oos_restock[df_oos_restock["Deployment"] == selected_cooler]
 
                 if product_filter_option == "Top 10 General":
@@ -3143,7 +3148,7 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Indexes Analysis", "Index by All SKUs", "Index by Top 10 Sku", "Index by Cooler"],
+            ["General Indexes Analysis", "Index by All SKUs", "Index by Top 10 Sku", "Index by Shelf"],
             key="index_view"
         )
 
@@ -3314,13 +3319,13 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                         row_sku.index.name = None
                         st.dataframe(row_sku, use_container_width=True)
 
-                        st.markdown("##### Heatmap: Cooler-Level Indexes for Selected SKU")
+                        st.markdown("##### Heatmap: Shelf-Level Indexes for Selected SKU")
 
                         # Agrupar por Deployment para el SKU seleccionado
                         df_sku_by_cooler = df_selected_sku.groupby("Deployment")[heatmap_metrics].mean().round(2)
 
                         if df_sku_by_cooler.empty:
-                            st.info("No cooler-level data available for this SKU.")
+                            st.info("No Shelf-level data available for this SKU.")
                         else:
                             fig_cooler, ax_cooler = plt.subplots(figsize=(10, max(4, 0.4 * len(df_sku_by_cooler))))
                             sns.heatmap(df_sku_by_cooler, annot=True, cmap="Blues", linewidths=0.5, ax=ax_cooler)
@@ -3389,11 +3394,11 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                 """, unsafe_allow_html=True)
 
         
-        elif view_option == "Index by Cooler":
+        elif view_option == "Index by Shelf":
             df_index_cooler = index_sum[index_sum["Location Id"] == location_id].copy()
 
             if df_index_cooler.empty:
-                st.warning("No cooler data available for this location.")
+                st.warning("No Shelf data available for this location.")
             else:
                 
 
@@ -3411,13 +3416,13 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                     text_auto=True,
                     color_continuous_scale="Blues",
                     aspect="auto",
-                    labels=dict(x="Metric", y="Cooler", color="Value")
+                    labels=dict(x="Metric", y="Shelf", color="Value")
                 )
 
                 fig_heat.update_layout(
-                    title="Index Heatmap by Cooler",
+                    title="Index Heatmap by Shelf",
                     xaxis_title="Metric",
-                    yaxis_title="Cooler",
+                    yaxis_title="Shelf",
                     margin=dict(l=100, r=20, t=50, b=50),
                     xaxis=dict(tickangle=90)
                 )
@@ -3441,18 +3446,18 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                 """, unsafe_allow_html=True)
 
 
-                # --- Deep Dive by cooler ---
+                # --- Deep Dive by Shelf ---
 
-                with st.expander("Deep Dive by cooler"):
+                with st.expander("Deep Dive by Shelf"):
                     st.markdown("""
-                    This selector allows you to change how products are filtered within the selected cooler:
-                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
-                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+                    This selector allows you to change how products are filtered within the selected Shelf:
+                - **All Products**: Displays all SKUs available in the selected Shelf during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected Shelf.               
                     """)
 
-                    # Selector de cooler
+                    # Selector de Shelf
                     selected_cooler = st.selectbox(
-                        "Select a Cooler",
+                        "Select a Shelf",
                         sorted(index_sum[index_sum["Location Id"] == location_id]["Deployment"].dropna().unique()),
                         key="cooler_selector_index"
                     )
@@ -3464,7 +3469,7 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                         key="product_filter_option_index"
                     )
 
-                    # Filtrar por cooler
+                    # Filtrar por Shelf
                     df_cooler = index_sum[
                         (index_sum["Location Id"] == location_id) &
                         (index_sum["Deployment"] == selected_cooler)
@@ -3481,16 +3486,16 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                         )
                         df_cooler = df_cooler[df_cooler["Product"].isin(top_10_general)]
 
-                    # Agrupar por SKU dentro del cooler
+                    # Agrupar por SKU dentro del Shelf
                     df_sku_metrics = df_cooler.groupby("Product")[[
                         "Velocity-to-Restock Ratio", "OOS-to-Restock Ratio",
                         "OOS Duration per Fill", "Pulls per Fill"
                     ]].mean().round(2)
 
                     if df_sku_metrics.empty:
-                        st.info("No SKU data available for this cooler.")
+                        st.info("No SKU data available for this Shelf.")
                     else:
-                        st.markdown("##### SKU Indexes in Selected Cooler")
+                        st.markdown("##### SKU Indexes in Selected Shelf")
                         fig_sku, ax_sku = plt.subplots(figsize=(10, max(4, 0.4 * len(df_sku_metrics))))
                         sns.heatmap(
                             df_sku_metrics,
