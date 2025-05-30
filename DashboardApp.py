@@ -1291,7 +1291,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             """, unsafe_allow_html=True)         
 
         elif view_option == "Pulls by Cooler":
-            st.markdown("""Shows overall pulls per cooler, and breaks down the top 10 SKUs within each cooler.
+            st.markdown("""Shows overall pulls per cooler, and breaks down the SKUs within each cooler.
                 """)
             # Vista de Pulls por Cooler
             pulls_by_cooler = (
@@ -1363,11 +1363,14 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive**"):
+            with st.expander("**Deep Dive by cooler**"):
                 st.markdown("""
-                            This section provides additional details about the Top 10 SKUs. 
-                                Use this information for deeper exploration, but note that it does not include specific insights.
-                            """)
+                             This selector allows you to change how products are filtered within the selected cooler:
+
+                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+                """)
+                            
                 
                 # Selector de cooler
                 selected_cooler = st.selectbox(
@@ -1460,7 +1463,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
 def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
     st.markdown("### Product Velocity Analysis")       
     # Filtrar los datos para la ubicación seleccionada
-    df_loc = pulls[pulls["Location Id"] == location_id]
+    df_loc = pulls[pulls["Location Id"] == location_id].copy()
 
     if df_loc.empty:
         st.warning(f"No data available for location ID {location_id}.")
@@ -1474,7 +1477,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Product Velocity", "PV by Top 10 Sku", "PV by Cooler"],
+            ["General Product Velocity","PV by All SKUs","PV by Top 10 Sku", "PV by Cooler"],
             key="product_velocity_view"
         )
 
@@ -1505,6 +1508,159 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)
  
+
+        elif view_option == "PV by All SKUs":
+
+            st.markdown(""" The velocity at which all products are consumed across the location.""")
+
+            # Convertir la columna 'Location Local Datetime' a datetime
+            df_loc["Location Local Datetime"] = pd.to_datetime(df_loc["Location Local Datetime"], errors='coerce')
+
+            # Calcular la fecha mínima y máxima para obtener el total de días en la data
+            total_days = (df_loc["Location Local Datetime"].dt.date.max() - df_loc["Location Local Datetime"].dt.date.min()).days + 1
+
+            # Calcular días únicos con datos por producto
+            df_loc["Date"] = df_loc["Location Local Datetime"].dt.date
+            days_with_data = df_loc.groupby("Product")["Date"].nunique().reset_index()
+            days_with_data.columns = ["Product", "Days with Data"]
+
+            # Agrupar pulls totales por producto (sin cortar al Top 10)
+            all_products = (
+                df_loc.groupby("Product")["Total Pulls"]
+                .sum()
+                .sort_values(ascending=False)
+                .head(10)
+                .reset_index()
+            )
+
+            # Combinar con días activos
+            all_products = all_products.merge(days_with_data, on="Product", how="left")
+
+            # Calcular Product Velocity
+            all_products["Velocity (Active Days)"] = all_products["Total Pulls"] / all_products["Days with Data"]
+            all_products["Velocity (Period)"] = all_products["Total Pulls"] / total_days
+
+            # Ordenar para gráfico
+            all_products = all_products.sort_values(by="Velocity (Active Days)", ascending=True)
+
+            # Crear gráfico
+            fig = px.bar(
+                all_products,
+                x=["Velocity (Active Days)", "Velocity (Period)"],
+                y="Product",
+                orientation="h",
+                title="All SKUs by Velocity",
+                barmode="group",
+                text_auto=True,
+                color_discrete_sequence=["#4682B4", "#ADD8E6"]
+            )
+            fig.update_layout(
+                height=20 * len(all_products),
+                yaxis=dict(title="Product"),
+                xaxis=dict(title="Velocity (pulls/day)")
+            )
+
+            # Promedio de Velocity (Period)
+            avg_velocity_period = all_products["Velocity (Period)"].mean()
+            fig.add_vline(
+                x=avg_velocity_period,
+                line_dash="dash",
+                line_width=1,
+                line_color="black",
+                annotation_text=f"Avg Period: {avg_velocity_period:.2f}",
+                annotation_position="top",
+                annotation_font_color="black"
+            )
+
+            
+            filename = f"{view_option}__{location_name}"
+            st.plotly_chart(fig, use_container_width=True,
+                            config={"toImageButtonOptions": {"filename": filename}})
+
+            # Insight
+            insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
+            # Convertir Markdown a HTML
+            insight_html = markdown.markdown(insight)
+            # Justificar el texto usando HTML
+            st.markdown(f"""
+            <div style="text-align: justify;">
+            {insight_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+
+            with st.expander("**Deep dive by product**"):
+            # Selector de búsqueda para SKU
+                selected_product = st.selectbox(
+                    "Search for a Product (SKU)",
+                    df_loc["Product"].dropna().unique(),
+                    key="sku_selector_velocity"
+                )
+
+                # Filtrar los datos para el producto seleccionado
+                df_product = df_loc[df_loc["Product"] == selected_product]
+
+               
+                # Calcular días únicos con datos para el producto seleccionado
+                active_days_product_deployment = (
+                    df_product.groupby("Deployment")["Date"]
+                    .nunique()
+                    .reset_index()
+                    .rename(columns={"Date": "Active Days"})
+                )
+
+                # Gráfico de Product Velocity por cooler para el SKU seleccionado
+                velocity_by_cooler_sku = (
+                    df_product.groupby("Deployment")["Total Pulls"]
+                    .sum()
+                    .reset_index()
+                )
+
+                     # Combinar los datos de días activos con los pulls totales
+                velocity_by_cooler_sku = velocity_by_cooler_sku.merge(
+                     active_days_product_deployment, on="Deployment", how="left"
+                )
+
+                velocity_by_cooler_sku["Velocity (Active Days)"] = (
+                    velocity_by_cooler_sku["Total Pulls"] / velocity_by_cooler_sku["Active Days"]
+                )
+
+                velocity_by_cooler_sku["Velocity (Period)"] = velocity_by_cooler_sku["Total Pulls"] / total_days
+
+                
+                #organizar los datos para el gráfico ascending
+                velocity_by_cooler_sku = velocity_by_cooler_sku.sort_values(by="Velocity (Active Days)", ascending=True)
+
+                #Figura
+                fig_sku = px.bar(
+                    velocity_by_cooler_sku,
+                    x=["Velocity (Active Days)", "Velocity (Period)"],
+                    y="Deployment",
+                    orientation="h",
+                    title=f"Product Velocity by Cooler for SKU: {selected_product}",
+                    barmode="group",
+                    text_auto=True,
+                    color_discrete_sequence=["#4682B4", "#ADD8E6"]
+                )
+                fig_sku.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="Velocity (pulls/day)"))
+
+                # Calcular el promedio de Velocity (Period)
+                avg_velocity_period = velocity_by_cooler_sku["Velocity (Period)"].mean()
+
+                # Agregar línea vertical de promedio solo para "Velocity (Period)"
+                fig_sku.add_vline(
+                    x=avg_velocity_period,
+                    line_dash="dash",
+                    line_width=1,
+                    line_color="black",
+                    annotation_text=f"Avg Period: {avg_velocity_period:.2f}",
+                    annotation_position="top",
+                    annotation_font_color="black"
+                )
+
+                st.plotly_chart(fig_sku, use_container_width=True)
+
+                gemini_analysis_button(location_name, selected_product, velocity_by_cooler_sku, metric_type="velocity", model_enabled=ENABLE_GEMINI)
 
         elif view_option == "PV by Top 10 Sku":
 
@@ -1585,81 +1741,6 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             {insight_html}
             </div>
             """, unsafe_allow_html=True)
-
-           
-
-            with st.expander("**Deep dive**"):
-            # Selector de búsqueda para SKU
-                selected_product = st.selectbox(
-                    "Search for a Product (SKU)",
-                    df_loc["Product"].dropna().unique(),
-                    key="sku_selector_velocity"
-                )
-
-                # Filtrar los datos para el producto seleccionado
-                df_product = df_loc[df_loc["Product"] == selected_product]
-
-                # Calcular días únicos con datos para el producto seleccionado
-                # Calcular días únicos con datos para el producto seleccionado
-                active_days_product_deployment = (
-                    df_product.groupby("Deployment")["Date"]
-                    .nunique()
-                    .reset_index()
-                    .rename(columns={"Date": "Active Days"})
-                )
-
-                # Gráfico de Product Velocity por cooler para el SKU seleccionado
-                velocity_by_cooler_sku = (
-                    df_product.groupby("Deployment")["Total Pulls"]
-                    .sum()
-                    .reset_index()
-                )
-
-                     # Combinar los datos de días activos con los pulls totales
-                velocity_by_cooler_sku = velocity_by_cooler_sku.merge(
-                     active_days_product_deployment, on="Deployment", how="left"
-                )
-
-                velocity_by_cooler_sku["Velocity (Active Days)"] = (
-                    velocity_by_cooler_sku["Total Pulls"] / velocity_by_cooler_sku["Active Days"]
-                )
-
-                velocity_by_cooler_sku["Velocity (Period)"] = velocity_by_cooler_sku["Total Pulls"] / total_days
-
-                
-                #organizar los datos para el gráfico ascending
-                velocity_by_cooler_sku = velocity_by_cooler_sku.sort_values(by="Velocity (Active Days)", ascending=True)
-
-                #Figura
-                fig_sku = px.bar(
-                    velocity_by_cooler_sku,
-                    x=["Velocity (Active Days)", "Velocity (Period)"],
-                    y="Deployment",
-                    orientation="h",
-                    title=f"Product Velocity by Cooler for SKU: {selected_product}",
-                    barmode="group",
-                    text_auto=True,
-                    color_discrete_sequence=["#4682B4", "#ADD8E6"]
-                )
-                fig_sku.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="Velocity (pulls/day)"))
-
-                # Calcular el promedio de Velocity (Period)
-                avg_velocity_period = velocity_by_cooler_sku["Velocity (Period)"].mean()
-
-                # Agregar línea vertical de promedio solo para "Velocity (Period)"
-                fig_sku.add_vline(
-                    x=avg_velocity_period,
-                    line_dash="dash",
-                    line_width=1,
-                    line_color="black",
-                    annotation_text=f"Avg Period: {avg_velocity_period:.2f}",
-                    annotation_position="top",
-                    annotation_font_color="black"
-                )
-
-                st.plotly_chart(fig_sku, use_container_width=True)
-
-                gemini_analysis_button(location_name, selected_product, velocity_by_cooler_sku, metric_type="velocity", model_enabled=ENABLE_GEMINI)
 
             
         elif view_option == "PV by Cooler":
@@ -1744,10 +1825,12 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive**"):
+            with st.expander("**Deep dive by cooler**"):
                 st.markdown("""
-                This section provides additional details about the behavioir of Top 10 SKU and all SKUs by Cooler. 
-                Use this information for deeper exploration, but note that it does not include specific insights.
+                This selector allows you to change how products are filtered within the selected cooler:
+
+                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
                 """)
                 # Selector de cooler
                 selected_cooler = st.selectbox(
@@ -1762,7 +1845,7 @@ def tab2_product_velocity(df_loc,pulls,location_id, location_name, insights):
                 # Subselector para elegir entre Top 10 General y Top 10 del Cooler
                 product_filter_option = st.radio(
                     "Select Product Filter",
-                    ["Top 10 General", "Top 10 Cooler"],
+                    ["All products", "Top 10 General"],
                     key="product_filter_option_velocity"
                 )
 
