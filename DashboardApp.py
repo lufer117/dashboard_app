@@ -2646,7 +2646,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General OOS Data", "OOS by Top 10 Sku", "OOS by Cooler"],
+            ["General OOS Data","OOS by All SKUs", "OOS by Top 10 Sku", "OOS by Cooler"],
             key="oos_view"
         )
 
@@ -2672,7 +2672,247 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             </div>
             """, unsafe_allow_html=True)  
 
+        elif view_option == "OOS by All SKUs":
+
+            st.markdown("""The out-of-stock behavior of all SKUs in the location.""")
+
+            # Agrupar por producto y calcular métricas promedio
+            df_all_skus = df_oos_restock.groupby(["Product Id", "Product"]).agg({
+                "OOS Frequency (per day)": "mean",
+                "Avg OOS Duration (hours)": "mean",
+                "Restocking Frequency (per day)": "mean"
+            }).reset_index()
+
+            # Crear columna de etiqueta
+            df_all_skus['Product Label'] = df_all_skus['Product'].astype(str)
+
+            # Calcular promedios para líneas horizontales
+            avg_oos_freq = df_all_skus["OOS Frequency (per day)"].mean()
+            avg_oos_duration = df_all_skus["Avg OOS Duration (hours)"].mean()
+
+            # Ordenar por OOS Frequency
+            df_all_skus = df_all_skus.sort_values(by="OOS Frequency (per day)", ascending=False)
+
+            # Crear figura
+            fig = go.Figure()
+
+            # Barra: OOS Frequency (per day)
+            fig.add_trace(go.Bar(
+                x=df_all_skus['Product Label'],
+                y=df_all_skus['OOS Frequency (per day)'],
+                name='OOS Frequency (per day)',
+                marker_color='lightcoral',
+                text=[f'{v:.1f}' for v in df_all_skus['OOS Frequency (per day)']],
+                textposition='outside',
+                yaxis="y1"
+            ))
+
+            # Barra: Restocking Frequency (per day)
+            fig.add_trace(go.Bar(
+                x=df_all_skus['Product Label'],
+                y=df_all_skus['Restocking Frequency (per day)'],
+                name='Restocking Frequency (per day)',
+                marker_color='navajowhite',
+                text=[f'{v:.1f}' for v in df_all_skus['Restocking Frequency (per day)']],
+                textposition='outside',
+                yaxis="y1"
+            ))
+
+            # Línea: Avg OOS Duration (hours)
+            fig.add_trace(go.Scatter(
+                x=df_all_skus['Product Label'],
+                y=df_all_skus['Avg OOS Duration (hours)'],
+                mode='lines+markers',
+                name='Avg OOS Duration (hours)',
+                marker=dict(color='purple', symbol='circle'),
+                line=dict(color='purple'),
+                yaxis="y2"
+            ))
+
+            # Línea horizontal: promedio OOS Frequency
+            fig.add_trace(go.Scatter(
+                x=df_all_skus['Product Label'],
+                y=[avg_oos_freq] * len(df_all_skus),
+                mode='lines',
+                name=f'Avg OOS Frequency (per day) ({avg_oos_freq:.2f})',
+                line=dict(dash='dash', color='lightcoral'),
+                hoverinfo='skip',
+                yaxis='y1'
+            ))
+
+            # Línea horizontal: promedio OOS Duration
+            fig.add_trace(go.Scatter(
+                x=df_all_skus['Product Label'],
+                y=[avg_oos_duration] * len(df_all_skus),
+                mode='lines',
+                name=f'Avg OOS Duration (hours) ({avg_oos_duration:.2f})',
+                line=dict(dash='dot', color='purple'),
+                hoverinfo='skip',
+                yaxis='y2'
+            ))
+
+            # Layout
+            fig.update_layout(
+                xaxis=dict(title="Product", tickangle=90),
+                yaxis=dict(
+                    title="Frequency OOS & Restock Incidents",
+                    tickfont=dict(color="black")
+                ),
+                yaxis2=dict(
+                    title="OOS Duration (hours)",
+                    overlaying="y",
+                    side="right",
+                    tickfont=dict(color="purple")
+                ),
+
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+                height=700,
+                margin=dict(t=50, b=200, r=100),
+            )
+
+            # Mostrar gráfico
+            
+            filename = f"{view_option}__{location_name}"
+            st.plotly_chart(fig, use_container_width=True,
+                            config={"toImageButtonOptions": {"filename": filename}})
+
+            # Mostrar el insight específico para la ubicación y vista
+            insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
+            # Convertir Markdown a HTML
+            insight_html = markdown.markdown(insight)
+            # Justificar el texto usando HTML
+            st.markdown(f"""
+            <div style="text-align: justify;">
+            {insight_html}
+            </div>
+            """, unsafe_allow_html=True)
+
+            with st.expander("**Deep dive by product**"):
+                st.markdown("""Allows selecting a specific product (SKU) 
+                to explore its OOS behavior across all coolers in the location.
+                Please Note that this does **not include specific insights**""")
+
+                # Selector de búsqueda para SKU
+                selected_product = st.selectbox(
+                    "Search for a Product (SKU)",
+                    sorted(df_oos_restock["Product"].dropna().unique()),
+                    key="sku_selector_oos"
+                )
+
+                # Filtrar el dataset para el producto seleccionado
+                df_product = df_oos_restock[df_oos_restock["Product"] == selected_product]
+
+                # Agrupar por cooler y calcular métricas promedio de OOS y Restocking
+                oos_by_cooler = (
+                    df_product.groupby("Deployment").agg({
+                        "OOS Frequency (per day)": "mean",
+                        "Avg OOS Duration (hours)": "mean",
+                        "Restocking Frequency (per day)": "mean"
+                    }).reset_index()
+                )
+
+                # Calcular los promedios generales (líneas horizontales)
+                avg_oos_freq = oos_by_cooler["OOS Frequency (per day)"].mean()
+                avg_oos_duration = oos_by_cooler["Avg OOS Duration (hours)"].mean()
+
+                # Ordenar por OOS Frequency
+                oos_by_cooler = oos_by_cooler.sort_values(by="OOS Frequency (per day)", ascending=False)
+
+                # Crear el gráfico
+                fig_cooler = go.Figure()
+
+                # Barra: OOS Frequency (per day)
+                fig_cooler.add_trace(go.Bar(
+                    x=oos_by_cooler["Deployment"],
+                    y=oos_by_cooler["OOS Frequency (per day)"],
+                    name="OOS Frequency (per day)",
+                    marker_color="lightcoral",
+                    text=[f'{v:.2f}' for v in oos_by_cooler["OOS Frequency (per day)"]],
+                    textposition="outside",
+                    yaxis="y1"
+                ))
+
+                # Barra: Restocking Frequency (per day)
+                fig_cooler.add_trace(go.Bar(
+                    x=oos_by_cooler["Deployment"],
+                    y=oos_by_cooler["Restocking Frequency (per day)"],
+                    name="Restocking Frequency (per day)",
+                    marker_color="navajowhite",
+                    text=[f'{v:.2f}' for v in oos_by_cooler["Restocking Frequency (per day)"]],
+                    textposition="outside",
+                    yaxis="y1"
+                ))
+
+                # Línea: Avg OOS Duration (hours)
+                fig_cooler.add_trace(go.Scatter(
+                    x=oos_by_cooler["Deployment"],
+                    y=oos_by_cooler["Avg OOS Duration (hours)"],
+                    mode="lines+markers",
+                    name="Avg OOS Duration (hours)",
+                    marker=dict(color="purple", symbol="circle"),
+                    line=dict(color="purple"),
+                    yaxis="y2"
+                ))
+
+                # Línea horizontal: promedio OOS Frequency
+                fig_cooler.add_trace(go.Scatter(
+                    x=oos_by_cooler["Deployment"],
+                    y=[avg_oos_freq] * len(oos_by_cooler),
+                    mode="lines",
+                    name=f"Avg OOS Freq ({avg_oos_freq:.2f})",
+                    line=dict(dash="dash", color="lightcoral"),
+                    hoverinfo="skip",
+                    yaxis="y1"
+                ))
+
+                # Línea horizontal: promedio OOS Duration
+                fig_cooler.add_trace(go.Scatter(
+                    x=oos_by_cooler["Deployment"],
+                    y=[avg_oos_duration] * len(oos_by_cooler),
+                    mode="lines",
+                    name=f"Avg OOS Duration ({avg_oos_duration:.2f} h)",
+                    line=dict(dash="dot", color="purple"),
+                    hoverinfo="skip",
+                    yaxis="y2"
+                ))
+
+                # Diseño del gráfico
+                fig_cooler.update_layout(
+                    xaxis=dict(
+                        title="Cooler",
+                        tickangle=90,
+                        domain=[0, 0.85]
+                    ),
+                    yaxis=dict(
+                        title=dict(text="Frequency (OOS & Restocking)", font=dict(color="black")),
+                        tickfont=dict(color="black"),
+                        title_standoff=10
+                    ),
+                    yaxis2=dict(
+                        title=dict(text="Avg OOS Duration (hours)", font=dict(color="purple")),
+                        tickfont=dict(color="purple"),
+                        overlaying="y",
+                        side="right",
+                        title_standoff=10
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5
+                    ),
+                    height=600,
+                    margin=dict(t=50, b=200, r=150)
+                )
+
+                # Mostrar gráfico
+                st.plotly_chart(fig_cooler, use_container_width=True)
+
+                gemini_analysis_button(location_name, selected_product, oos_by_cooler, metric_type="oos", model_enabled=ENABLE_GEMINI)
+
         elif view_option == "OOS by Top 10 Sku":
+
             st.markdown("""The out-of-stock behavior of the top 10 SKUs in the location""")
 
              # Obtener el Top 10 productos con más pulls en la ubicación
@@ -2797,131 +3037,6 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             {insight_html}
             </div>
             """, unsafe_allow_html=True)
-
-            with st.expander("**Deep dive**"):
-                st.markdown("""Allows selecting a specific product (SKU) 
-                to explore its OOS behavior across all coolers in the location.
-                Please Note that this does **not include specific insights**""")
-
-                # Selector de búsqueda para SKU
-                selected_product = st.selectbox(
-                    "Search for a Product (SKU)",
-                    sorted(df_oos_restock["Product"].dropna().unique()),
-                    key="sku_selector_oos"
-                )
-
-                # Filtrar el dataset para el producto seleccionado
-                df_product = df_oos_restock[df_oos_restock["Product"] == selected_product]
-
-                # Agrupar por cooler y calcular métricas promedio de OOS y Restocking
-                oos_by_cooler = (
-                    df_product.groupby("Deployment").agg({
-                        "OOS Frequency (per day)": "mean",
-                        "Avg OOS Duration (hours)": "mean",
-                        "Restocking Frequency (per day)": "mean"
-                    }).reset_index()
-                )
-
-                # Calcular los promedios generales (líneas horizontales)
-                avg_oos_freq = oos_by_cooler["OOS Frequency (per day)"].mean()
-                avg_oos_duration = oos_by_cooler["Avg OOS Duration (hours)"].mean()
-
-                # Ordenar por OOS Frequency
-                oos_by_cooler = oos_by_cooler.sort_values(by="OOS Frequency (per day)", ascending=False)
-
-                # Crear el gráfico
-                fig_cooler = go.Figure()
-
-                # Barra: OOS Frequency (per day)
-                fig_cooler.add_trace(go.Bar(
-                    x=oos_by_cooler["Deployment"],
-                    y=oos_by_cooler["OOS Frequency (per day)"],
-                    name="OOS Frequency (per day)",
-                    marker_color="lightcoral",
-                    text=[f'{v:.2f}' for v in oos_by_cooler["OOS Frequency (per day)"]],
-                    textposition="outside",
-                    yaxis="y1"
-                ))
-
-                # Barra: Restocking Frequency (per day)
-                fig_cooler.add_trace(go.Bar(
-                    x=oos_by_cooler["Deployment"],
-                    y=oos_by_cooler["Restocking Frequency (per day)"],
-                    name="Restocking Frequency (per day)",
-                    marker_color="navajowhite",
-                    text=[f'{v:.2f}' for v in oos_by_cooler["Restocking Frequency (per day)"]],
-                    textposition="outside",
-                    yaxis="y1"
-                ))
-
-                # Línea: Avg OOS Duration (hours)
-                fig_cooler.add_trace(go.Scatter(
-                    x=oos_by_cooler["Deployment"],
-                    y=oos_by_cooler["Avg OOS Duration (hours)"],
-                    mode="lines+markers",
-                    name="Avg OOS Duration (hours)",
-                    marker=dict(color="purple", symbol="circle"),
-                    line=dict(color="purple"),
-                    yaxis="y2"
-                ))
-
-                # Línea horizontal: promedio OOS Frequency
-                fig_cooler.add_trace(go.Scatter(
-                    x=oos_by_cooler["Deployment"],
-                    y=[avg_oos_freq] * len(oos_by_cooler),
-                    mode="lines",
-                    name=f"Avg OOS Freq ({avg_oos_freq:.2f})",
-                    line=dict(dash="dash", color="lightcoral"),
-                    hoverinfo="skip",
-                    yaxis="y1"
-                ))
-
-                # Línea horizontal: promedio OOS Duration
-                fig_cooler.add_trace(go.Scatter(
-                    x=oos_by_cooler["Deployment"],
-                    y=[avg_oos_duration] * len(oos_by_cooler),
-                    mode="lines",
-                    name=f"Avg OOS Duration ({avg_oos_duration:.2f} h)",
-                    line=dict(dash="dot", color="purple"),
-                    hoverinfo="skip",
-                    yaxis="y2"
-                ))
-
-                # Diseño del gráfico
-                fig_cooler.update_layout(
-                    xaxis=dict(
-                        title="Cooler",
-                        tickangle=90,
-                        domain=[0, 0.85]
-                    ),
-                    yaxis=dict(
-                        title=dict(text="Frequency (OOS & Restocking)", font=dict(color="black")),
-                        tickfont=dict(color="black"),
-                        title_standoff=10
-                    ),
-                    yaxis2=dict(
-                        title=dict(text="Avg OOS Duration (hours)", font=dict(color="purple")),
-                        tickfont=dict(color="purple"),
-                        overlaying="y",
-                        side="right",
-                        title_standoff=10
-                    ),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="center",
-                        x=0.5
-                    ),
-                    height=600,
-                    margin=dict(t=50, b=200, r=150)
-                )
-
-                # Mostrar gráfico
-                st.plotly_chart(fig_cooler, use_container_width=True)
-
-                gemini_analysis_button(location_name, selected_product, oos_by_cooler, metric_type="oos", model_enabled=ENABLE_GEMINI)
-
         
         elif view_option == "OOS by Cooler":
             st.markdown("""The OOS behavior across all coolers in the location.""")
@@ -3044,9 +3159,11 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander("**Deep dive**"):
-                st.markdown("""Allows selecting a specific cooler to explore its OOS behavior across SKUs in the location. 
-                            Use this information for deeper exploration, but note that it does **not include specific insights**.""")
+            with st.expander("**Deep dive by cooler**"):
+                st.markdown("""This selector allows you to change how products are filtered within the selected cooler:
+                            - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
+                            - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
+                            """)
 
                 # Selector de cooler
                 selected_cooler = st.selectbox(
@@ -3058,7 +3175,7 @@ def tab4_oos_incidents(df_loc_oos,df_oos_restock,loc_oos_sum, oos_restock_sum, l
                 # Subselector de filtro
                 product_filter_option = st.radio(
                     "Select Product Filter",
-                    ["Top 10 General", "Top 10 Cooler"],
+                    ["All products", "Top 10 General"],
                     key="product_filter_option_oos"
                 )
 
