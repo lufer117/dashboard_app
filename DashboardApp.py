@@ -3359,7 +3359,7 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Indexes Analysis", "Index by Top 10 Sku", "Index by Cooler"],
+            ["General Indexes Analysis", "Index by All SKUs", "Index by Top 10 Sku", "Index by Cooler"],
             key="index_view"
         )
 
@@ -3450,6 +3450,98 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
             """, unsafe_allow_html=True)
                 
                 
+        elif view_option == "Index by All SKUs":
+            df_index_sku = index_sum[index_sum["Location Id"] == location_id].copy()
+
+            if df_index_sku.empty:
+                st.warning("No SKU data available for this location.")
+            else:
+                # Métricas a mostrar en el heatmap
+                heatmap_metrics = [
+                    "Velocity-to-Restock Ratio", 
+                    "OOS-to-Restock Ratio",
+                    "OOS Duration per Fill", 
+                    "Pulls per Fill"
+                ]
+
+                # Preparar los datos: eliminar duplicados por SKU y establecer índice
+                df_heat = (
+                    df_index_sku.drop_duplicates(subset=["Product"])
+                    .set_index("Product")
+                    .round(2)
+                    #.reset_index()                      
+                )
+
+                # Crear el heatmap con todos los productos
+                fig_heat = px.imshow(
+                    df_heat[heatmap_metrics],
+                    text_auto=True,
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                    labels=dict(x="Metric", y="Product", color="Value")
+                )
+
+                fig_heat.update_layout(
+                    title="Index Heatmap (All Products)",
+                    xaxis_title="Metric",
+                    yaxis_title="Product",
+                    margin=dict(l=100, r=20, t=50, b=50),
+                    xaxis=dict(tickangle=90),
+                    height=max(500, 40 * len(df_heat))  # altura dinámica si hay muchos productos
+                )
+
+                filename = f"{view_option}__{location_name}"
+                st.plotly_chart(
+                    fig_heat,
+                    use_container_width=True,
+                    config={"toImageButtonOptions": {"filename": filename}}
+                )
+
+                # Mostrar el insight específico para la ubicación y vista
+                insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
+                # Convertir Markdown a HTML
+                insight_html = markdown.markdown(insight)
+                # Justificar el texto usando HTML
+                st.markdown(f"""
+                <div style="text-align: justify;">
+                {insight_html}
+                </div>
+                """, unsafe_allow_html=True)
+
+                              
+
+                # --- Deep Dive para cualquier SKU ---
+                with st.expander("Deep Dive by SKU"):
+                    sku_options = df_index_sku["Product"].dropna().unique()
+                    selected_sku = st.selectbox("Select any SKU", sorted(sku_options))
+
+                    df_selected_sku = df_index_sku[df_index_sku["Product"] == selected_sku]
+
+                    if df_selected_sku.empty:
+                        st.info("No data available for this SKU.")
+                    else:
+                        st.markdown("##### Metrics Overview")
+
+                        row_sku = df_selected_sku.iloc[0][[
+                            "Avg Daily Pulls", "Restocking Frequency (per day)", "OOS Frequency (per day)",
+                            "Avg OOS Duration (hours)", "OOS-to-Restock Ratio", "Velocity-to-Restock Ratio",
+                            "OOS Duration per Fill", "Pulls per Fill"
+                        ]].round(2).to_frame(name="Value")
+                        row_sku.index.name = None
+                        st.dataframe(row_sku, use_container_width=True)
+
+                        st.markdown("##### Heatmap: Cooler-Level Indexes for Selected SKU")
+
+                        # Agrupar por Deployment para el SKU seleccionado
+                        df_sku_by_cooler = df_selected_sku.groupby("Deployment")[heatmap_metrics].mean().round(2)
+
+                        if df_sku_by_cooler.empty:
+                            st.info("No cooler-level data available for this SKU.")
+                        else:
+                            fig_cooler, ax_cooler = plt.subplots(figsize=(10, max(4, 0.4 * len(df_sku_by_cooler))))
+                            sns.heatmap(df_sku_by_cooler, annot=True, cmap="Blues", linewidths=0.5, ax=ax_cooler)
+                            st.pyplot(fig_cooler)
+
         elif view_option == "Index by Top 10 Sku":
             df_index_sku = index_sum[index_sum["Location Id"] == location_id].copy()
 
@@ -3512,40 +3604,7 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                 </div>
                 """, unsafe_allow_html=True)
 
-                              
-
-                # --- Deep Dive para cualquier SKU ---
-                with st.expander("Deep Dive by SKU"):
-                    sku_options = df_index_sku["Product"].dropna().unique()
-                    selected_sku = st.selectbox("Select any SKU", sorted(sku_options))
-
-                    df_selected_sku = df_index_sku[df_index_sku["Product"] == selected_sku]
-
-                    if df_selected_sku.empty:
-                        st.info("No data available for this SKU.")
-                    else:
-                        st.markdown("##### Metrics Overview")
-
-                        row_sku = df_selected_sku.iloc[0][[
-                            "Avg Daily Pulls", "Restocking Frequency (per day)", "OOS Frequency (per day)",
-                            "Avg OOS Duration (hours)", "OOS-to-Restock Ratio", "Velocity-to-Restock Ratio",
-                            "OOS Duration per Fill", "Pulls per Fill"
-                        ]].round(2).to_frame(name="Value")
-                        row_sku.index.name = None
-                        st.dataframe(row_sku, use_container_width=True)
-
-                        st.markdown("##### Heatmap: Cooler-Level Indexes for Selected SKU")
-
-                        # Agrupar por Deployment para el SKU seleccionado
-                        df_sku_by_cooler = df_selected_sku.groupby("Deployment")[heatmap_metrics].mean().round(2)
-
-                        if df_sku_by_cooler.empty:
-                            st.info("No cooler-level data available for this SKU.")
-                        else:
-                            fig_cooler, ax_cooler = plt.subplots(figsize=(10, max(4, 0.4 * len(df_sku_by_cooler))))
-                            sns.heatmap(df_sku_by_cooler, annot=True, cmap="Blues", linewidths=0.5, ax=ax_cooler)
-                            st.pyplot(fig_cooler)
-
+        
         elif view_option == "Index by Cooler":
             df_index_cooler = index_sum[index_sum["Location Id"] == location_id].copy()
 
@@ -3600,10 +3659,11 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
 
                 # --- Deep Dive by cooler ---
 
-                with st.expander("Deep Dive"):
+                with st.expander("Deep Dive by cooler"):
                     st.markdown("""
-                    Allows selecting a specific cooler to explore performance indexes across SKUs.  
-                    Use the filter to switch between the store's Top 10 products overall or the Top 10 within this cooler.
+                    This selector allows you to change how products are filtered within the selected cooler:
+                - **All Products**: Displays all SKUs available in the selected cooler during the analysis period.
+                - **Top 10 General**: Shows only the SKUs that belong to the overall Top 10 most pulled products across the entire location, but filters them within the selected cooler.               
                     """)
 
                     # Selector de cooler
@@ -3616,7 +3676,7 @@ def tab5_indexes(df_loc_indexes, loc_indexes, df_index_sku,index_sum, location_i
                     # Subselector: tipo de top 10
                     product_filter_option = st.radio(
                         "Select Product Filter",
-                        ["Top 10 General", "Top 10 Cooler"],
+                        ["All products", "Top 10 General"],
                         key="product_filter_option_index"
                     )
 
