@@ -25,12 +25,12 @@ This is a generalized version of a Streamlit dashboard developed to analyze prod
 
 ```bash
 .
-├── DashboardApp.py             # Main Streamlit app
+├── DashboardApp.py           # Main Streamlit app
 ├── data/                     # Pre-processed CSVs for pulls, restocking, OOS, etc.
 ├── assets/                   # UI assets: logos, banners, etc.
 ├── insights/                 # JSON files with AI-generated insights
 ├── figures/                  # Chart images exported for Gemini processing
-├── figures_general/ # High-level summary charts for AI analysis
+├── figures_general/          # High-level summary charts for AI analysis
 ├── requirements.txt          # Python dependencies
 └── .gitignore                # Ignores local files like secrets, envs, etc.
 ```
