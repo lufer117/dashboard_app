@@ -181,7 +181,7 @@ def gemini_analysis_by_cooler(
         st.info(f"You already ran Gemini analysis for this Cooler ({metric_type}) in this session.")
 
 
-#@st.cache_data
+@st.cache_data
 def load_all_data():
     pulls = pd.read_csv("data/pulls_summary_full.csv")
     overview_table = pd.read_csv("data/overview_final_stats_table.csv")
