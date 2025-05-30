@@ -1,0 +1,3 @@
+Location Id,Location,Total Restock Incidents,Total Products Restocked,Time Between Restocks,Avg Time Between Restocks (hours),Restocking Frequency (per day),Avg Daily Products Restocked,Avg Daily Pulls
+2394,Store B,723,1991.0,0 days 04:59:41.364098337,4.994823360649166,4.756578947368421,13.098684210526315,10.131578947368421
+2680,Store A,40365,97747.0,0 days 00:05:23.186934074,0.08977414835388889,265.5592105263158,643.0723684210526,636.2894736842105

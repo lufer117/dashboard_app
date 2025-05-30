@@ -1,0 +1,4 @@
+Location,SKU Count,Pulls (Excludes Unnamed),Fills (Excludes Unnamed),OOS Incidents,Unnamed Products Count,Coolers Count,Date range
+Store A,20,96716.0,97747.0,3146,0,5,01-Dec-2024 to 01-May-2025
+Store B,5,1540.0,1991.0,4,0,5,01-Dec-2024 to 01-May-2025
+Total,25,98256.0,99738.0,3150,0,10,01-Dec-2024 to 01-May-2025
