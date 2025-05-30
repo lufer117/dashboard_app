@@ -227,7 +227,7 @@ data = load_all_data()
 
 @st.cache_data
 def load_general_insights():
-    with open("insights/insights_general.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_general_lorem.json", "r", encoding="utf-8") as f:
         general_insights = json.load(f)
     return general_insights
 
@@ -235,7 +235,7 @@ general_insights = load_general_insights()
 
 @st.cache_data
 def load_insights():
-    with open("insights/insights_gem.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_gem_lorem.json", "r", encoding="utf-8") as f:
         insights = json.load(f)
     return insights
 
@@ -244,7 +244,7 @@ insights = load_insights()
 
 @st.cache_data
 def load_general_insights():
-    with open("insights/insights_key_conclusions.json", "r", encoding="utf-8") as f:
+    with open("insights/insights_key_conclusions_lorem.json", "r", encoding="utf-8") as f:
         general_insights = json.load(f)
     return general_insights
 
@@ -255,17 +255,12 @@ insights_key_conclusions = load_general_insights()
 
 def presentation():
     st.image("assets/presentation_banner.png", use_container_width=True)
-
-    _, exp_col, _ = st.columns([1,3,1])
-    with exp_col:
-        with st.expander("**📖 How to navigate this app**"):
-            st.markdown("""
-                    <div style="text-align: justify;">
-                    Use the sidebar on the left to navigate through each section of the dashboard.
-                    Start with the <b>presentation</b> and <b>methodology</b>, then explore <b>metric definitions</b> and <b>location performance</b> 
-                    (including pulls, product velocity, restocking, out-of-stock (OOS) incidents, and indexes).
-                    Each slide presents specific insights and visuals to help you understand cooler performance and product movement.
-                    </div>""", unsafe_allow_html=True)
+    #escribir marckdown
+    st.markdown("""<div style="text-align: justify"> 
+                This is a generic version based on an app developed for product analysis at points of sale. 
+                The data has been modified or generated for illustrative purposes
+    </div>
+    """, unsafe_allow_html=True)
 
 def dataset():
     st.markdown("<h2 style='font-weight:bold;'>DATA SET</h2>", unsafe_allow_html=True)
@@ -3262,7 +3257,16 @@ def location_analysis(location_id: int, data: dict):
 # st.sidebar.image("assets/logo1.png", width=200)
 
 # Sidebar Navigation
-st.sidebar.title("The company Analysis")
+st.sidebar.title("Data Analysis")
+with st.sidebar.expander("**📖 How to navigate this app**"):
+            st.markdown("""
+                    <div style="text-align: justify;">
+                    Use the sidebar on the left to navigate through each section of the dashboard.
+                    Start with the <b>presentation</b> and <b>methodology</b>, then explore <b>metric definitions</b> and <b>location performance</b> 
+                    (including pulls, product velocity, restocking, out-of-stock (OOS) incidents, and indexes).
+                    Each slide presents specific insights and visuals to help you understand cooler performance and product movement.
+                    </div>""", unsafe_allow_html=True)
+            
 slide = st.sidebar.radio("Navigation:", [
     "1. Presentation",
     "2. Data Set",
