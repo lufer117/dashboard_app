@@ -240,12 +240,35 @@ def load_insights():
 insights = load_insights()
 
 @st.cache_data
-def load_general_insights():
+def load_key_conclusions():
     with open("insights/insights_key_conclusions_lorem.json", "r", encoding="utf-8") as f:
         general_insights = json.load(f)
     return general_insights
 
-insights_key_conclusions = load_general_insights()
+insights_key_conclusions = load_key_conclusions()
+
+# # Obtener todas las locaciones y normalizar para comparación
+# ALL_LOCATIONS = list(data["location_ids"].keys())
+# normalized_locations = {loc.lower(): loc for loc in ALL_LOCATIONS}
+
+# # Input manual
+# user_input = st.sidebar.text_input("Enter location name(s), separated by comma:")
+
+# if user_input:
+#     inputs = [i.strip().lower() for i in user_input.split(",")]
+#     matched = [normalized_locations[i] for i in inputs if i in normalized_locations]
+#     not_matched = [i for i in inputs if i not in normalized_locations]
+
+#     if matched:
+#         ACTIVE_LOCATIONS = matched
+#         if not_matched:
+#             st.sidebar.warning(f"Some locations were not recognized: {', '.join(not_matched)}")
+#     else:
+#         st.sidebar.error("None of the entered locations were recognized.")
+#         st.stop()
+# else:
+#     st.sidebar.info("Please enter at least one location name.")
+#     st.stop()
 
 
 # Banner
@@ -939,7 +962,7 @@ def general_overview(location_filter, overview_table, overview_stats, general_in
 def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
     st.markdown("### Pulls Analysis")
     # Filtrar los datos para la ubicación seleccionada
-    df_loc = pulls[pulls["Location Id"] == location_id]
+    df_loc = pulls[pulls["Location Id"] == location_id].copy()
 
     if df_loc.empty:
         st.warning(f"No data available for location ID {location_id}.")
@@ -947,7 +970,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
         # Selector de vista principal
         view_option = st.selectbox(
             "Select View",
-            ["General Overview Pulls","Pulls by Top 10 Sku", "Pulls by Cooler"],
+            ["General Overview Pulls","Pulls by All SKUs","Pulls by Top 10 SKU", "Pulls by Cooler"],
             key="total_pulls_view"
         )
 
@@ -1002,13 +1025,150 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             <div style="text-align: justify;">
             {insight_html}
             </div>
+            """, unsafe_allow_html=True)       
+            
+        elif view_option == "Pulls by All SKUs":
+            
+            all_products = (
+                df_loc.groupby("Product")["Total Pulls"]
+                .sum()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
+
+            total_pulls_all_products = all_products["Total Pulls"].sum()
+            all_products["% Pulls"] = (all_products["Total Pulls"] / total_pulls_all_products) * 100
+            all_products = all_products.sort_values(by="% Pulls", ascending=True)
+
+            fig_all = px.bar(
+                all_products,
+                x="% Pulls",
+                y="Product",
+                orientation="h",
+                title="All Products by % of Total Pulls",
+                text=all_products["% Pulls"].map("{:.2f}%".format),
+                color_discrete_sequence=["#2E8B57"],
+                custom_data=["Total Pulls"]
+            )
+
+            fig_all.update_traces(
+                textposition="outside",
+                hovertemplate=(
+                    "Product: %{y}<br>"
+                    "Percentage: %{x:.2f}%<br>"
+                    "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
+                )
+            )
+
+            avg_percent = all_products["% Pulls"].mean()
+            fig_all.add_shape(
+                type="line",
+                x0=avg_percent, x1=avg_percent,
+                y0=-0.5, y1=len(all_products)-0.5,
+                line=dict(color="black", dash="dash", width=1)
+            )
+            fig_all.add_annotation(
+                x=avg_percent,
+                y=len(all_products)-0.5,
+                text=f"Avg: {avg_percent:.2f}%",
+                showarrow=False,
+                font=dict(color="black"),
+                xanchor="left",
+                yanchor="bottom",
+                bgcolor="white"
+            )
+
+            fig_all.update_layout(height=20 * len(all_products))
+
+            filename = f"{view_option}__{location_name}"
+            st.plotly_chart(fig_all, use_container_width=True, key="pulls_all_skus_chart",
+                            config={"toImageButtonOptions": {"filename": filename}})
+
+            insight = insights.get(location_name, {}).get(view_option, "No insight available for this view.")
+            insight_html = markdown.markdown(insight)
+            st.markdown(f"""
+            <div style="text-align: justify;">
+            {insight_html}
+            </div>
             """, unsafe_allow_html=True)
 
-            
-            
-        elif view_option == "Pulls by Top 10 Sku":
-            
-            # Expandible para el análisis del Top 10
+            with st.expander("**Deep Dive by product**"):
+                st.markdown("""Allows selecting a specific product (SKU) 
+                            to explore its pull behavior across all coolers in the location.""")
+                
+                   
+
+                # Selector de búsqueda para SKU
+                selected_product = st.selectbox(
+                    "Search for a Product (SKU)",
+                    df_loc["Product"].dropna().unique(),
+                    key="sku_selector"
+                )
+
+                # Filtrar los datos para el producto seleccionado
+                df_product = df_loc[df_loc["Product"] == selected_product]
+
+                # Agrupar por cooler y calcular los pulls
+                pulls_by_cooler = (
+                    df_product.groupby("Deployment")["Total Pulls"]
+                    .sum()
+                    .sort_values(ascending=False)
+                    .reset_index()
+                )
+
+                # Calcular el porcentaje de pulls por cooler para el SKU seleccionado
+                total_pulls_sku = pulls_by_cooler["Total Pulls"].sum()
+                pulls_by_cooler["% Pulls"] = (pulls_by_cooler["Total Pulls"] / total_pulls_sku) * 100
+
+                #organizar los datos para el gráfico ascending
+                pulls_by_cooler = pulls_by_cooler.sort_values(by="% Pulls", ascending=True)
+
+                # Gráfico de barras horizontales
+                fig_cooler = px.bar(
+                    pulls_by_cooler,
+                    x="% Pulls",
+                    y="Deployment",
+                    orientation="h",
+                    title=f"Total Pulls by Cooler for Product: {selected_product}",
+                    text=pulls_by_cooler["% Pulls"].map("{:.2f}%".format),
+                    color_discrete_sequence=["#2E8B57"],  # Color verde
+                    custom_data=["Total Pulls"]
+                )
+                fig_cooler.update_traces(
+                    textposition="outside",
+                    hovertemplate=(
+                        "Cooler: %{y}<br>"
+                        "Percentage: %{x:.2f}%<br>"
+                        "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
+                    )
+                )
+                # Calcular el promedio de % Pulls para el producto seleccionado
+                avg_percent = pulls_by_cooler["% Pulls"].mean()
+                # Agregar línea de promedio
+                fig_cooler.add_shape(
+                    type="line",
+                    x0=avg_percent, x1=avg_percent,
+                    y0=-0.5, y1=len(pulls_by_cooler)-0.5,
+                    line=dict(color="black", dash="dash", width=1),
+                )
+                fig_cooler.add_annotation(
+                    x=avg_percent,
+                    y=len(pulls_by_cooler)-0.5,
+                    text=f"Avg: {avg_percent:.2f}%",
+                    showarrow=False,
+                    font=dict(color="black"),
+                    xanchor="left",
+                    yanchor="bottom",
+                    bgcolor="white"
+                )
+                fig_cooler.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="% of Total Pulls"))
+                st.plotly_chart(fig_cooler, use_container_width=True, key="cooler_for_product_chart")
+
+                gemini_analysis_button(location_name, selected_product, pulls_by_cooler, metric_type="pull", model_enabled=ENABLE_GEMINI)
+
+
+        elif view_option =="Pulls by Top 10 SKU":
+                # Expandible para el análisis del Top 10
             exp_col = st.container()
             with exp_col:
                 with st.expander("**📖 Why analysis the Top 10?**"):
@@ -1051,13 +1211,13 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
                         st.plotly_chart(pie_chart, use_container_width=True, key="sku_pie_chart", 
                                         config={"toImageButtonOptions": {"filename": filename}}
                                         )
-                   
+                
                     with col2:
 
                         insight = insights.get(location_name, {}).get("why top", "No insight available for this view.")
                         insight_html = markdown.markdown(insight)
                         st.markdown(f"<div style='text-align: justify;'>{insight_html}</div>", unsafe_allow_html=True)
-   
+
 
             # Gráfico de barras horizontales del top 10 general
             total_pulls_all_products = df_loc["Total Pulls"].sum()
@@ -1128,116 +1288,7 @@ def tab1_total_pulls(df_loc,pulls,location_id, location_name, insights):
             <div style="text-align: justify;">
             {insight_html}
             </div>
-            """, unsafe_allow_html=True)
-
-                
-            
-            with st.expander("**Deep dive**"):
-                st.markdown("""Allows selecting a specific product (SKU) 
-                            to explore its pull behavior across all coolers in the location.""")
-                # Vista de SKU (anteriormente "Top 10 Products")
-                st.markdown("#### SKU Analysis")
-            
-
-                # Selector de búsqueda para SKU
-                selected_product = st.selectbox(
-                    "Search for a Product (SKU)",
-                    df_loc["Product"].dropna().unique(),
-                    key="sku_selector"
-                )
-
-                # Filtrar los datos para el producto seleccionado
-                df_product = df_loc[df_loc["Product"] == selected_product]
-
-                # Agrupar por cooler y calcular los pulls
-                pulls_by_cooler = (
-                    df_product.groupby("Deployment")["Total Pulls"]
-                    .sum()
-                    .sort_values(ascending=False)
-                    .reset_index()
-                )
-
-                # Calcular el porcentaje de pulls por cooler para el SKU seleccionado
-                total_pulls_sku = pulls_by_cooler["Total Pulls"].sum()
-                pulls_by_cooler["% Pulls"] = (pulls_by_cooler["Total Pulls"] / total_pulls_sku) * 100
-
-                #organizar los datos para el gráfico ascending
-                pulls_by_cooler = pulls_by_cooler.sort_values(by="% Pulls", ascending=True)
-
-                # Gráfico de barras horizontales
-                fig_cooler = px.bar(
-                    pulls_by_cooler,
-                    x="% Pulls",
-                    y="Deployment",
-                    orientation="h",
-                    title=f"Total Pulls by Cooler for Product: {selected_product}",
-                    text=pulls_by_cooler["% Pulls"].map("{:.2f}%".format),
-                    color_discrete_sequence=["#2E8B57"],  # Color verde
-                    custom_data=["Total Pulls"]
-                )
-                fig_cooler.update_traces(
-                    textposition="outside",
-                    hovertemplate=(
-                        "Cooler: %{y}<br>"
-                        "Percentage: %{x:.2f}%<br>"
-                        "Total Pulls: %{customdata[0]:,.0f}<extra></extra>"
-                    )
-                )
-                # Calcular el promedio de % Pulls para el producto seleccionado
-                avg_percent = pulls_by_cooler["% Pulls"].mean()
-                # Agregar línea de promedio
-                fig_cooler.add_shape(
-                    type="line",
-                    x0=avg_percent, x1=avg_percent,
-                    y0=-0.5, y1=len(pulls_by_cooler)-0.5,
-                    line=dict(color="black", dash="dash", width=1),
-                )
-                fig_cooler.add_annotation(
-                    x=avg_percent,
-                    y=len(pulls_by_cooler)-0.5,
-                    text=f"Avg: {avg_percent:.2f}%",
-                    showarrow=False,
-                    font=dict(color="black"),
-                    xanchor="left",
-                    yanchor="bottom",
-                    bgcolor="white"
-                )
-                fig_cooler.update_layout(yaxis=dict(title="Cooler"), xaxis=dict(title="% of Total Pulls"))
-                st.plotly_chart(fig_cooler, use_container_width=True, key="cooler_for_product_chart")
-
-                gemini_analysis_button(location_name, selected_product, pulls_by_cooler, metric_type="pull", model_enabled=ENABLE_GEMINI)
-
-                # # Crear el prompt para el análisis
-                # prompt = f"""
-                # Analyze the pull performance of this SKU.
-
-                # Location: {location_name}
-                # Product: {selected_product}
-
-                # Total Pulls by Cooler:
-                # {pulls_by_cooler.to_string(index=False)}
-
-                # Summarize performance, detect anomalies or patterns, and suggest operational actions.
-                # """
-
-                # # ---- Protección anti-spam: limitar análisis por SKU
-                # if "gpt_used" not in st.session_state:
-                #     st.session_state.gpt_used = {}
-
-                # if selected_product not in st.session_state.gpt_used:
-                #     if st.button("🔍 Analyze with GPT", key=f"gpt_pull_{selected_product}"):
-                #         with st.spinner("Analyzing with GPT..."):
-                #             result = analyze_with_openai(prompt)
-                #             st.markdown("**GPT Insight:**")
-                #             st.markdown(f"> {result}")
-                #             st.session_state.gpt_used[selected_product] = True
-                # else:
-                #     st.info("You already ran GPT analysis for this SKU in this session.")
-
-
-
-
-
+            """, unsafe_allow_html=True)         
 
         elif view_option == "Pulls by Cooler":
             st.markdown("""Shows overall pulls per cooler, and breaks down the top 10 SKUs within each cooler.
