@@ -282,7 +282,7 @@ def dataset():
     st.markdown("<h2 style='font-weight:bold;'>DATA SET</h2>", unsafe_allow_html=True)
 
     st.markdown("""
-    The company has installed 10 coolers across two locations. The idea is to identify what the consumption of coolers product is.
+    The company has been tracking 10 shelfs across two locations. The idea is to identify what the consumption of shelf product is.
     The following sections cover a general analysis and an analysis of each location.
     """)
 
@@ -290,17 +290,16 @@ def dataset():
     st.markdown("""
     <div style="border:1px solid #ccc; padding:10px; border-radius:6px; background-color:#f9f9f9; margin-top:15px;">
         <ul style="list-style-type: '◾'; padding-left: 20px;">
-            <li><b>Time Period:</b> 01 Oct 2024 - 01 May 2025</li>
+            <li><b>Time Period:</b> 01-Dec-2024 to 01-May-2025</li>
             <li><b>Using all week data:</b> Monday to Sunday, 24h</li>
-            <li><b>Time zone:</b> American/New York Zone</li>
-            <li><b>NOTE:</b> This analysis does not takes into account the records reported under Product ID: -1 </li>
+            <li><b>Time zone:</b> American/New York Zone </li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown(" ")
 
-    st.markdown("Data set **'Stock_sense'** contains the following columns:")
+    st.markdown("Data set **'anonimized_data'** contains the following columns:")
     # Dataset name and date range
     
     st.markdown("""
@@ -328,19 +327,6 @@ def methodology():
     with tab1:
         st.markdown("""
         <div style="text-align: justify">        
-
-        <hr>
-
-        <h5> Raw File Consolidation</h5>
-
-        <b>1.1 List and sort CSV files</b><br>
-        All individual <code>.csv</code> files containing sensor data were listed from a shared folder and sorted alphabetically to ensure consistent chronological order.<br><br>
-
-        <b>1.2 Chunk-based reading</b><br>
-        Each file was read in chunks of 500,000 rows to handle large volumes efficiently and prevent memory overload.<br><br>
-
-        <b>1.3 Merge into a single dataset</b><br>
-        All chunks were appended and saved into a unified dataset called <code>merged_stock.csv</code>.
 
         <hr>
 
@@ -391,7 +377,7 @@ def methodology():
         This classification was applied within each group defined by <code>Product Id</code>, <code>Location Id</code>, <code>Deployment Id</code>, and <code>Placement Id</code>.<br><br>
 
         <b>4.5 Save classified dataset</b><br>
-        The final dataset with movement classification was saved as <code>real_pulls.csv</code>.
+        The final dataset with movement classification was saved as <code>dataset_anonimized.csv</code>.
 
         
         </div>
@@ -402,26 +388,24 @@ def methodology():
         
 
         <ol style="text-align: justify;">
-        <li><b>Dataset Loading:</b> Loaded the <i>real_pulls.csv</i> file containing stock sensor data with 271,509 records and 17 columns.</li>
+        <li><b>Dataset Loading:</b> Loaded the <i>dataset_anonimized.csv</i> file containing stock sensor data with 113441 records and 17 columns.</li>
         
-        <li><b>Missing Values Analysis:</b> Examined null values across columns. Notable missing data was identified in the <code>Product</code> column (7674 rows) and in <code>Data Change</code>, <code>Prev_Data</code>, and <code>Next_Data</code> (494 rows each).</li>
+        <li><b>Missing Values Analysis:</b> Examined null values across columns. There were not missing data
         
         <li><b>Null Investigation in "Data Change":</b> Inspected the content of null cells in <code>Data Change</code>. Found non-numeric values like the string "nan" and confirmed these were not malformed characters but actual missing entries.</li>
         
         <li><b>Unique Value Counts:</b> Counted unique values for each column to identify cardinality. Key findings include:
             <ul>
-            <li>2 unique locations</li>
-            <li>10 unique deployments (coolers)</li>
-            <li>84 named products + 7674 unnamed</li>
-            <li>4 unique statuses</li>
+            <li>2 unique locations: Store A, Store B</li>
+            <li>10 unique deployments (shelfs)</li>
+            <li>25 named products</li>
             </ul>
         </li>
         
-        <li><b>Datetime Range Check:</b> Parsed <code>Location Local Datetime</code> and validated the full dataset's date range: from <b>October 1, 2024</b> to <b>May 1, 2025</b>.</li>
+        <li><b>Datetime Range Check:</b> Parsed <code>Location Local Datetime</code> and validated the full dataset's date range: from <b>December 1, 2024</b> to <b>May 1, 2025</b>.</li>
         
         <li><b>Object Columns Profiling:</b> Printed all unique values in object-type columns to check for anomalies or encoding issues, including shelf labels.</li>
         
-        <li><b>Invalid Product Records:</b> Identified records with invalid <code>Product Id = -1</code> or <code>Product = NaN</code> as candidates for removal.</li>
         </ol>
         """, unsafe_allow_html=True)
 
@@ -435,32 +419,19 @@ def methodology():
             st.markdown("""
             <div style='text-align: justify'>
 
-        
-
-            1. **Datetime Standardization**
-            - Timestamps in the `Location Local Datetime` column were corrected by appending missing microseconds (e.g., `.000000`) to ensure uniform parsing.
-            - Timezones were removed while preserving the real clock time, maintaining the original hour context.
-
-            2. **Datetime Parsing & Feature Extraction**
+            1. **Datetime Parsing & Feature Extraction**
             - Converted datetime strings to `datetime` objects.
             - Extracted useful time-based features including `Date`, `DayOfWeek`, `HourOfDay`, and `Month` to facilitate temporal analysis.
 
-            3. **Cleaning ‘Data Change’ Values**
+            2. **Cleaning ‘Data Change’ Values**
             - The `Data Change` column, derived from product count variation, was coerced into numeric format and converted to absolute values to represent magnitude.
             - Missing values in `Data Change` for rows labeled as “Stable” in `Status` were filled with 0.
 
-            4. **Removal of Unnamed Products**
-            - Entries with `Product Id = -1` and missing `Product` names were excluded.
-            - These rows likely represent unidentified or manually moved items without a proper SKU assignment.
-
-            5. **Deployment Name Simplification**
-            - The suffix “- Compass Group HQ” was removed from the `Deployment` names to streamline Shelf labeling.
-
-            6. **Sorting and Reindexing**
+            3. **Sorting and Reindexing**
             - The dataset was sorted by `Location`, `Product`, and `Location Local Datetime` to prepare for time series analysis.
 
-            7. **Validation of Final Dataset**
-            - The final cleaned dataset was validated for nulls and correct data types, resulting in a clean structure with 263,835 rows.
+            4. **Validation of Final Dataset**
+            - The final cleaned dataset was validated for nulls and correct data types, resulting in a clean structure with 113,441 rows.
 
             </div>
             """, unsafe_allow_html=True)

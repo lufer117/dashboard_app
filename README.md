@@ -1,7 +1,9 @@
 
-# Dashboard App (Generalized Analysis)
+# Dashboard App (Retail Analytics)
 
 This is a generalized version of a Streamlit dashboard developed to analyze product movement, restocking efficiency, out-of-stock patterns, and performance indexes across multiple coolers and SKUs in retail environments.
+
+[Click here to launch the app](https://retail-analytics.streamlit.app/)
 
 > **Disclaimer**: The original application was built for a real client with shelf-installed sensors capturing product telemetry. For this version, **all sensitive data has been anonymized or synthetically generated** for illustrative purposes.
 
@@ -31,6 +33,7 @@ This is a generalized version of a Streamlit dashboard developed to analyze prod
 ├── insights/                 # JSON files with AI-generated insights
 ├── figures/                  # Chart images exported for Gemini processing
 ├── figures_general/          # High-level summary charts for AI analysis
+├── scripts/                  # Data transformed script (jupyter notebook)
 ├── requirements.txt          # Python dependencies
 └── .gitignore                # Ignores local files like secrets, envs, etc.
 ```
